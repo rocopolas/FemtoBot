@@ -1,0 +1,13 @@
+# ═══════════════════════════════════════════════════════════════
+#                    LOCALBOT - CONFIGURACIÓN
+# ═══════════════════════════════════════════════════════════════
+MODEL: "glm-4.7-flash:q8_0"
+CONTEXT_LIMIT: 200000
+WHISPER_LANGUAGE: "es"
+WHISPER_MODEL_VOICE: "base"
+WHISPER_MODEL_EXTERNAL: "medium"
+INACTIVITY_TIMEOUT_MINUTES: 5
+CRON_CLEANUP_INTERVAL_MINUTES: 30
+EVENTS_FILE: "data/events.txt"
+INSTRUCTIONS_FILE: "data/instructions.md"
+MEMORY_FILE: "data/memory.md"

@@ -1,0 +1,89 @@
+Screen {
+    layout: vertical;
+}
+
+#chat-container {
+    height: 1fr;
+    width: 100%;
+    margin-bottom: 1;
+    scrollbar-size: 1 1;
+}
+
+.message-container {
+    height: auto;
+    width: 100%;
+    margin-top: 1;
+    margin-bottom: 1;
+}
+
+.user-container {
+    align-horizontal: right;
+}
+
+.bot-container {
+    align: left top;
+}
+
+.message {
+    padding: 1 2;
+    height: auto;
+    width: auto;
+    max-width: 70%;
+    border-top: solid $panel-lighten-2;
+}
+
+.user-message {
+    background: $primary;
+    color: $text-primary;
+    margin-right: 2;
+}
+
+.bot-message {
+    background: $surface;
+    color: $text;
+    margin-left: 2;
+    border: solid $primary-darken-3;
+}
+
+#input-area {
+    height: auto;
+    width: 100%;
+    dock: bottom;
+}
+
+/* Markdown Specific Styles */
+MarkdownFence {
+    background: $panel-darken-1;
+    border: solid $primary;
+    margin: 1 0;
+    padding: 0 1;
+}
+
+MarkdownCode {
+    background: $panel-darken-1;
+    color: $text-accent;
+}
+
+MarkdownH1, MarkdownH2, MarkdownH3 {
+    color: $accent;
+    text-style: bold;
+    margin-top: 1;
+}
+
+MarkdownBlockQuote {
+    border-left: solid $accent;
+    background: $panel-lighten-1;
+    padding-left: 1;
+    margin: 1 0;
+    color: $text-muted;
+}
+
+.success-message {
+    color: green;
+    border: solid green;
+}
+
+.error-message {
+    color: red;
+    border: solid red;
+}
