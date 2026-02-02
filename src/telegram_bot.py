@@ -395,6 +395,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         formatted_response = full_response.replace("<think>", "> 🧠 **Pensando:**\n> ").replace("</think>", "\n\n")
         formatted_response = re.sub(r'\x1b\[[0-9;]*m', '', formatted_response)
         formatted_response = re.sub(r':::memory\s+.+?:::', '', formatted_response, flags=re.DOTALL)
+        formatted_response = re.sub(r':::memory_delete\s+.+?:::', '', formatted_response, flags=re.DOTALL)
         formatted_response = formatted_response.strip()
         
         try:
@@ -499,6 +500,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         formatted_response = full_response.replace("<think>", "> 🧠 **Pensando:**\n> ").replace("</think>", "\n\n")
         formatted_response = re.sub(r'\x1b\[[0-9;]*m', '', formatted_response)
         formatted_response = re.sub(r':::memory\s+.+?:::', '', formatted_response, flags=re.DOTALL)
+        formatted_response = re.sub(r':::memory_delete\s+.+?:::', '', formatted_response, flags=re.DOTALL)
         formatted_response = formatted_response.strip()
         
         try:
@@ -684,6 +686,7 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
             # Remove all command patterns from output
             final_formatted = re.sub(r':::search\s+.+?:::', '', final_formatted)
             final_formatted = re.sub(r':::memory\s+.+?:::', '', final_formatted, flags=re.DOTALL)
+            final_formatted = re.sub(r':::memory_delete\s+.+?:::', '', final_formatted, flags=re.DOTALL)
             final_formatted = re.sub(r':::cron_delete\s+.+?:::', '', final_formatted)
             final_formatted = re.sub(r':::cron\s+.+?:::', '', final_formatted)
             final_formatted = final_formatted.strip()
@@ -702,6 +705,7 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
             formatted_response = re.sub(r'\x1b\[[0-9;]*m', '', formatted_response)
             # Remove all command patterns from output
             formatted_response = re.sub(r':::memory\s+.+?:::', '', formatted_response, flags=re.DOTALL)
+            formatted_response = re.sub(r':::memory_delete\s+.+?:::', '', formatted_response, flags=re.DOTALL)
             formatted_response = re.sub(r':::cron_delete\s+.+?:::', '', formatted_response)
             formatted_response = re.sub(r':::cron\s+.+?:::', '', formatted_response)
             
@@ -754,7 +758,30 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
             else:
                  await context.bot.send_message(chat_id, f"❌ Error al agregar tarea.")
         
-        # 3. Memory commands - append to memory.md
+        # 3. Memory delete commands - remove from memory.md
+        for memory_del_match in re.finditer(r":::memory_delete\s+(.+?):::", full_response, re.DOTALL):
+            target = memory_del_match.group(1).strip()
+            if target:
+                try:
+                    memory_path = os.path.join(PROJECT_ROOT, get_config("MEMORY_FILE"))
+                    with open(memory_path, "r", encoding="utf-8") as f:
+                        lines = f.readlines()
+                    
+                    # Filter out lines containing the target
+                    new_lines = [line for line in lines if target.lower() not in line.lower()]
+                    removed = len(lines) - len(new_lines)
+                    
+                    if removed > 0:
+                        with open(memory_path, "w", encoding="utf-8") as f:
+                            f.writelines(new_lines)
+                        load_memory()
+                        await context.bot.send_message(chat_id, f"🗑️ Eliminado de memoria: _{target}_", parse_mode="Markdown")
+                    else:
+                        await context.bot.send_message(chat_id, f"⚠️ No se encontró en memoria: _{target}_", parse_mode="Markdown")
+                except Exception as e:
+                    await context.bot.send_message(chat_id, f"⚠️ Error eliminando memoria: {str(e)}")
+        
+        # 4. Memory add commands - append to memory.md
         for memory_match in re.finditer(r":::memory\s+(.+?):::", full_response, re.DOTALL):
             memory_content = memory_match.group(1).strip()
             if memory_content:

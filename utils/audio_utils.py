@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from utils.config_loader import get_config
+import gc
 
 # Lazy load whisper to avoid import errors if not installed
 _model = None
@@ -30,10 +31,27 @@ def get_whisper_model_large():
             return None
     return _model_large
 
+def unload_whisper_model():
+    """Unload the voice whisper model from memory."""
+    global _model
+    if _model is not None:
+        del _model
+        _model = None
+        gc.collect()
+
+def unload_whisper_model_large():
+    """Unload the large whisper model from memory."""
+    global _model_large
+    if _model_large is not None:
+        del _model_large
+        _model_large = None
+        gc.collect()
+
 async def transcribe_audio(audio_path: str) -> str:
     """
     Transcribes an audio file using faster-whisper.
     Returns the transcription text or an error message.
+    Unloads the model after transcription to free RAM.
     """
     model = get_whisper_model()
     
@@ -54,11 +72,14 @@ async def transcribe_audio(audio_path: str) -> str:
         
     except Exception as e:
         return f"[Error de transcripción: {str(e)}]"
+    finally:
+        unload_whisper_model()
 
 async def transcribe_audio_large(audio_path: str) -> str:
     """
     Transcribes an audio file using the larger whisper model.
     For external audio files that need better quality.
+    Unloads the model after transcription to free RAM.
     """
     model = get_whisper_model_large()
     
@@ -79,6 +100,8 @@ async def transcribe_audio_large(audio_path: str) -> str:
         
     except Exception as e:
         return f"[Error de transcripción: {str(e)}]"
+    finally:
+        unload_whisper_model_large()
 
 def is_whisper_available() -> bool:
     """Check if faster-whisper is available."""
@@ -87,3 +110,4 @@ def is_whisper_available() -> bool:
         return True
     except ImportError:
         return False
+
