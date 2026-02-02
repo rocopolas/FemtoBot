@@ -3,6 +3,7 @@ import re
 import sys
 import asyncio
 import logging
+import base64
 from datetime import datetime
 from dotenv import load_dotenv
 from telegram import Update
@@ -163,6 +164,28 @@ _Nota: Los tokens son aproximados (1 token ≈ 4 caracteres)_"""
     
     await update.message.reply_text(status_text, parse_mode="Markdown")
 
+async def unload_models(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Unloads all models from RAM."""
+    user_id = update.effective_user.id
+    
+    if not is_authorized(user_id):
+        await update.message.reply_text(f"⛔ No tienes acceso.", parse_mode="Markdown")
+        return
+    
+    status_msg = await update.message.reply_text("🔄 Descargando modelos...")
+    
+    client = OllamaClient()
+    
+    # Unload text model
+    await client.unload_model(MODEL)
+    
+    # Unload vision model if configured
+    vision_model = get_config("VISION_MODEL")
+    if vision_model:
+        await client.unload_model(vision_model)
+    
+    await status_msg.edit_text("✅ Modelos descargados de RAM.")
+
 
 def escape_markdown(text: str) -> str:
     """Helper to escape Markdown special characters for Telegram."""
@@ -286,6 +309,113 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Show transcription only (no LLM processing)
         await status_msg.edit_text(f"📝 *Transcripción de* `{file_name}`:\n\n{transcription}", parse_mode="Markdown")
             
+    except Exception as e:
+        await status_msg.edit_text(f"❌ Error: {str(e)}")
+
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles photos by describing them with vision model and processing with LLM."""
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    
+    # Authorization check
+    if not is_authorized(user_id):
+        await update.message.reply_text(f"⛔ No tienes acceso a este bot.\nTu ID es: `{user_id}`", parse_mode="Markdown")
+        return
+    
+    # Get vision model from config
+    vision_model = get_config("VISION_MODEL")
+    if not vision_model:
+        await update.message.reply_text("⚠️ Modelo de visión no configurado en config.yaml")
+        return
+    
+    status_msg = await update.message.reply_text("🔍 Analizando imagen...")
+    
+    try:
+        # Get the largest photo (best quality)
+        photo = update.message.photo[-1]
+        photo_file = await context.bot.get_file(photo.file_id)
+        
+        # Download to temp file
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+            await photo_file.download_to_drive(tmp.name)
+            tmp_path = tmp.name
+        
+        # Read and encode to base64
+        with open(tmp_path, "rb") as f:
+            image_base64 = base64.b64encode(f.read()).decode("utf-8")
+        
+        # Clean up temp file
+        try:
+            os.unlink(tmp_path)
+        except:
+            pass
+        
+        # Get image description from vision model
+        client = OllamaClient()
+        await status_msg.edit_text(f"🔍 Analizando imagen con {vision_model}...")
+        
+        # Use caption as prompt if provided, otherwise default
+        caption = update.message.caption
+        if caption:
+            vision_prompt = f"El usuario envió esta imagen con el mensaje: '{caption}'. Describe la imagen en detalle."
+        else:
+            vision_prompt = "Describe esta imagen en detalle. ¿Qué ves? Incluye objetos, personas, colores, texto visible, y cualquier detalle relevante."
+        
+        image_description = await client.describe_image(vision_model, image_base64, vision_prompt)
+        
+        # Unload vision model to free RAM
+        await client.unload_model(vision_model)
+        
+        await status_msg.edit_text("💭 Procesando respuesta...")
+        
+        # Initialize chat history if needed
+        if chat_id not in chat_histories:
+            chat_histories[chat_id] = []
+            system_prompt = get_system_prompt()
+            if system_prompt:
+                chat_histories[chat_id].append({"role": "system", "content": system_prompt})
+        
+        # Build context message for text model
+        if caption:
+            context_message = f"[El usuario envió una imagen con el mensaje: '{caption}']\n\n[Descripción de la imagen: {image_description}]\n\nResponde al usuario considerando la imagen y su mensaje."
+        else:
+            context_message = f"[El usuario envió una imagen]\n\n[Descripción de la imagen: {image_description}]\n\nComenta sobre la imagen de manera útil."
+        
+        # Add to history
+        chat_histories[chat_id].append({"role": "user", "content": context_message})
+        
+        # Generate response with text model
+        full_response = ""
+        async for chunk in client.stream_chat(MODEL, chat_histories[chat_id]):
+            full_response += chunk
+        
+        # Format response and strip commands
+        formatted_response = full_response.replace("<think>", "> 🧠 **Pensando:**\n> ").replace("</think>", "\n\n")
+        formatted_response = re.sub(r'\x1b\[[0-9;]*m', '', formatted_response)
+        formatted_response = re.sub(r':::memory\s+.+?:::', '', formatted_response, flags=re.DOTALL)
+        formatted_response = formatted_response.strip()
+        
+        try:
+            await status_msg.edit_text(formatted_response, parse_mode="Markdown")
+        except Exception:
+            await status_msg.edit_text(formatted_response)
+        
+        # Add to history
+        chat_histories[chat_id].append({"role": "assistant", "content": full_response})
+        
+        # Parse memory commands
+        for memory_match in re.finditer(r":::memory\s+(.+?):::", full_response, re.DOTALL):
+            memory_content = memory_match.group(1).strip()
+            if memory_content:
+                try:
+                    memory_path = os.path.join(PROJECT_ROOT, get_config("MEMORY_FILE"))
+                    with open(memory_path, "a", encoding="utf-8") as f:
+                        f.write(f"\n- {memory_content}")
+                    load_memory()
+                    await context.bot.send_message(chat_id, f"💾 Guardado en memoria: _{memory_content}_", parse_mode="Markdown")
+                except Exception as e:
+                    await context.bot.send_message(chat_id, f"⚠️ Error guardando memoria: {str(e)}")
+        
     except Exception as e:
         await status_msg.edit_text(f"❌ Error: {str(e)}")
 
@@ -614,16 +744,20 @@ if __name__ == '__main__':
     start_handler = CommandHandler('start', start)
     new_handler = CommandHandler('new', new_conversation)
     status_handler = CommandHandler('status', status)
+    unload_handler = CommandHandler('unload', unload_models)
     msg_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message)
     voice_handler = MessageHandler(filters.VOICE, handle_voice)
     audio_handler = MessageHandler(filters.AUDIO, handle_audio)
+    photo_handler = MessageHandler(filters.PHOTO, handle_photo)
     
     application.add_handler(start_handler)
     application.add_handler(new_handler)
     application.add_handler(status_handler)
+    application.add_handler(unload_handler)
     application.add_handler(msg_handler)
     application.add_handler(voice_handler)
     application.add_handler(audio_handler)
+    application.add_handler(photo_handler)
     
     # Check events every 2 seconds
     if application.job_queue:

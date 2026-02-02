@@ -58,3 +58,31 @@ class OllamaClient:
                 await client.post(url, json=payload)
         except:
             pass # Best effort cleanup
+
+    async def describe_image(self, model: str, image_base64: str, prompt: str = "Describe esta imagen en detalle.") -> str:
+        """Uses a vision model to describe an image."""
+        url = f"{self.base_url}/api/chat"
+        payload = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt,
+                    "images": [image_base64]
+                }
+            ],
+            "stream": False
+        }
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, json=payload, timeout=120.0)
+                if response.status_code == 200:
+                    data = response.json()
+                    return data.get("message", {}).get("content", "[Sin descripción]")
+                else:
+                    return f"[Error del modelo de visión: {response.status_code}]"
+        except httpx.ConnectError:
+            return "[Error: No se pudo conectar a Ollama]"
+        except Exception as e:
+            return f"[Error: {str(e)}]"

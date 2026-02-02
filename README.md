@@ -5,6 +5,7 @@ A smart personal assistant that runs locally using [Ollama](https://ollama.ai). 
 ## ✨ Features
 
 - 💬 **Local LLM chat** - No external API dependencies
+- 📷 **Image analysis** - Describe and understand images with vision model
 - 🎙️ **Audio transcription** - Convert voice messages to text with Whisper
 - 🎥 **YouTube summaries** - Send a link and get a summary
 - 🔍 **Web search** - Brave Search integration
@@ -87,6 +88,7 @@ BRAVE_API_KEY=your_api_key  # Optional, for searches
 ### `config.yaml`
 ```yaml
 MODEL: "glm-4.7-flash:q8_0"
+VISION_MODEL: "qwen3-vl:2b"
 CONTEXT_LIMIT: 200000
 WHISPER_LANGUAGE: "es"
 WHISPER_MODEL_VOICE: "base"
@@ -117,8 +119,13 @@ python src/main.py
 | `/start` | Start conversation |
 | `/new` | New conversation (clears history) |
 | `/status` | View context and token usage |
+| `/unload` | Unload all models from RAM |
 
 ## 🎤 Special Features
+
+### Image Analysis
+- Send a photo → Vision model describes it, text model responds
+- Send photo + caption → Bot considers both for response
 
 ### Audio Transcription
 - Send a voice message → Transcribed and answered

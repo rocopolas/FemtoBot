@@ -2,6 +2,7 @@
 #                    LOCALBOT - CONFIGURACIÓN
 # ═══════════════════════════════════════════════════════════════
 MODEL: "glm-4.7-flash:q8_0"
+VISION_MODEL: "qwen3-vl:2b"
 CONTEXT_LIMIT: 200000
 WHISPER_LANGUAGE: "es"
 WHISPER_MODEL_VOICE: "base"
