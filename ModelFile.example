@@ -1,0 +1,4 @@
+FROM glm-4.7-flash:latest
+
+PARAMETER num_ctx 200000
+PARAMETER temperature = 0.1
