@@ -10,6 +10,7 @@ A smart personal assistant that runs locally using [Ollama](https://ollama.ai). 
 - 🎥 **YouTube summaries** - Send a link and get a summary
 - 🔍 **Web search** - Brave Search integration
 - 📄 **Document reading** - Analyze and chat with PDF or text files
+- 📧 **Email digest** - Read and summarize emails from Gmail
 - ⏰ **Reminders** - Schedule cron tasks that notify you in chat
 - 🧠 **Persistent memory** - The bot remembers information about you
 
@@ -84,6 +85,8 @@ TELEGRAM_TOKEN=your_botfather_token
 AUTHORIZED_USERS=123456789  # Your Telegram ID
 NOTIFICATION_CHAT_ID=123456789
 BRAVE_API_KEY=your_api_key  # Optional, for searches
+GMAIL_USER=your_email@gmail.com  # Optional, for email digest
+GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
 ```
 
 ### `config.yaml`
@@ -148,6 +151,13 @@ Ask the bot things like:
 The bot can remember information about you:
 - Edit `data/memory.md` with your data
 - Or just tell it things and it will remember automatically
+
+### Email Digest (Optional)
+If Gmail is configured, the bot will:
+- Run at 4:00 AM daily
+- Read emails from the last 24 hours
+- Use LLM to identify important emails
+- Send you a summary on Telegram
 
 ## 🔧 Development
 

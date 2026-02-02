@@ -19,6 +19,7 @@ from utils.search_utils import BraveSearch
 from utils.audio_utils import transcribe_audio, transcribe_audio_large, is_whisper_available
 from utils.youtube_utils import is_youtube_url, download_youtube_audio, get_video_title
 from utils.document_utils import extract_text_from_document, is_supported_document
+from utils.email_utils import is_gmail_configured, fetch_emails_last_24h, format_emails_for_llm
 from utils.config_loader import get_config
 
 # Load environment variables
@@ -836,6 +837,69 @@ async def cleanup_old_crons(context: ContextTypes.DEFAULT_TYPE):
     if removed > 0:
         print(f"[CLEANUP] Removed {removed} old cron job(s)")
 
+async def daily_email_digest(context: ContextTypes.DEFAULT_TYPE):
+    """Fetches emails from last 24h and sends a summary of important ones."""
+    # Only run if Gmail is configured
+    if not is_gmail_configured():
+        return
+    
+    notification_chat_id = os.getenv("NOTIFICATION_CHAT_ID")
+    if not notification_chat_id:
+        return
+    
+    try:
+        print("[EMAIL DIGEST] Fetching emails from last 24 hours...")
+        emails = await fetch_emails_last_24h()
+        
+        if not emails:
+            print("[EMAIL DIGEST] No new emails")
+            return
+        
+        if "error" in emails[0]:
+            await context.bot.send_message(
+                notification_chat_id,
+                f"⚠️ Error al revisar emails: {emails[0]['error']}"
+            )
+            return
+        
+        # Format emails for LLM
+        email_summary = format_emails_for_llm(emails)
+        
+        # Use LLM to identify important emails
+        client = OllamaClient()
+        analysis_prompt = f"""Analiza estos emails recibidos en las últimas 24 horas. 
+Identifica los más IMPORTANTES (urgentes, de personas conocidas, acciones requeridas).
+Ignora spam, newsletters y promociones.
+Responde en español con un resumen breve de los emails importantes.
+Si no hay nada importante, dilo brevemente.
+
+{email_summary}"""
+        
+        messages = [{"role": "user", "content": analysis_prompt}]
+        
+        full_response = ""
+        async for chunk in client.stream_chat(MODEL, messages):
+            full_response += chunk
+        
+        # Remove thinking tags
+        formatted = full_response.replace("<think>", "").replace("</think>", "")
+        formatted = formatted.strip()
+        
+        # Send digest
+        await context.bot.send_message(
+            notification_chat_id,
+            f"📬 **Resumen de emails (últimas 24h)**\n\n{formatted}",
+            parse_mode="Markdown"
+        )
+        
+        # Unload model after use
+        await client.unload_model(MODEL)
+        
+        print(f"[EMAIL DIGEST] Sent summary of {len(emails)} emails")
+        
+    except Exception as e:
+        print(f"[EMAIL DIGEST] Error: {str(e)}")
+
 if __name__ == '__main__':
     if not TOKEN or TOKEN == "your_telegram_token_here":
         print("Error: TELEGRAM_TOKEN not set in .env")
@@ -874,6 +938,10 @@ if __name__ == '__main__':
         # Cleanup old crons periodically
         cleanup_interval = get_config("CRON_CLEANUP_INTERVAL_MINUTES") * 60
         application.job_queue.run_repeating(cleanup_old_crons, interval=cleanup_interval)
+        # Daily email digest at 4:00 AM (only runs if Gmail is configured)
+        if is_gmail_configured():
+            from datetime import time as dt_time
+            application.job_queue.run_daily(daily_email_digest, time=dt_time(hour=4, minute=0))
     
     print("Bot is polling...")
     application.run_polling()
