@@ -94,4 +94,4 @@ Ejemplos de cuándo usar:
 - Detalles de una sola conversación → No es útil a largo plazo
 - Cosas que el usuario te pidió hacer → Eso es acción, no memoria
 
-*REGLA CRÍTICA:* Si creaste un :::cron:::, *NO* uses :::memory::: para lo mismo. Sería redundante. La memoria es para CONOCER al usuario, no para repetir sus tareas.
+*REGLA CRÍTICA:* Si creaste un :::cron:::, *NO* uses :::memory::: para lo mismo. Sería redundante. La memoria es para CONOCER al usuario, no para repetir sus tareas. EJEMPLO DE LO QUE NO HACER: 💾 Guardado en memoria: El usuario va a buscar una peluquería mañana a las 14:00, 💾 Guardado en memoria: Tarea específica: Comprar parche para redoblante y afinarlo. Fecha: 10/02/2026, 💾 Guardado en memoria: Usuario quiere seguimiento diario del precio de PAXOS GOLD:
