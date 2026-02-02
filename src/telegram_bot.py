@@ -4,7 +4,7 @@ import sys
 import asyncio
 import logging
 import base64
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
@@ -61,6 +61,8 @@ user_memory = ""
 # Message queue for sequential processing
 message_queue = asyncio.Queue()
 queue_worker_running = False
+last_activity = datetime.now()
+email_digest_running = False
 
 # Project root directory (parent of src/)
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -853,8 +855,13 @@ async def check_events(context: ContextTypes.DEFAULT_TYPE):
 async def check_inactivity(context: ContextTypes.DEFAULT_TYPE):
     """Unloads model if no activity for configured timeout."""
     global last_activity
+    # Don't unload if email digest is running
+    if email_digest_running:
+        print("[INACTIVITY] Skipping unload - email digest in progress")
+        return
     timeout_seconds = get_config("INACTIVITY_TIMEOUT_MINUTES") * 60
     if (datetime.now() - last_activity).total_seconds() > timeout_seconds:
+        print("[INACTIVITY] Unloading model due to timeout")
         client = OllamaClient()
         await client.unload_model(MODEL)
 
@@ -866,6 +873,8 @@ async def cleanup_old_crons(context: ContextTypes.DEFAULT_TYPE):
 
 async def daily_email_digest(context: ContextTypes.DEFAULT_TYPE):
     """Fetches emails from last 24h and sends a summary of important ones."""
+    global email_digest_running
+    
     # Only run if Gmail is configured
     if not is_gmail_configured():
         return
@@ -874,9 +883,14 @@ async def daily_email_digest(context: ContextTypes.DEFAULT_TYPE):
     if not notification_chat_id:
         return
     
+    # Set flag to prevent model unload during digest
+    email_digest_running = True
+    print("[EMAIL DIGEST] Flag set, starting digest...")
+    
     try:
         print("[EMAIL DIGEST] Fetching emails from last 24 hours...")
         emails = await fetch_emails_last_24h()
+        print(f"[EMAIL DIGEST] Fetched {len(emails)} emails")
         
         if not emails:
             print("[EMAIL DIGEST] No new emails")
@@ -891,6 +905,7 @@ async def daily_email_digest(context: ContextTypes.DEFAULT_TYPE):
         
         # Format emails for LLM
         email_summary = format_emails_for_llm(emails)
+        print(f"[EMAIL DIGEST] Formatted summary ({len(email_summary)} chars)")
         
         # Use LLM to identify important emails
         client = OllamaClient()
@@ -904,15 +919,23 @@ Si no hay nada importante, dilo brevemente.
         
         messages = [{"role": "user", "content": analysis_prompt}]
         
+        print("[EMAIL DIGEST] Starting LLM analysis...")
         full_response = ""
+        chunk_count = 0
         async for chunk in client.stream_chat(MODEL, messages):
             full_response += chunk
+            chunk_count += 1
+            if chunk_count % 10 == 0:
+                print(f"[EMAIL DIGEST] Received {chunk_count} chunks...")
+        
+        print(f"[EMAIL DIGEST] LLM done. Response length: {len(full_response)} chars")
         
         # Remove thinking tags
         formatted = full_response.replace("<think>", "").replace("</think>", "")
         formatted = formatted.strip()
         
         # Send digest
+        print("[EMAIL DIGEST] Sending message to Telegram...")
         await context.bot.send_message(
             notification_chat_id,
             f"📬 **Resumen de emails (últimas 24h)**\n\n{formatted}",
@@ -925,7 +948,22 @@ Si no hay nada importante, dilo brevemente.
         print(f"[EMAIL DIGEST] Sent summary of {len(emails)} emails")
         
     except Exception as e:
+        import traceback
         print(f"[EMAIL DIGEST] Error: {str(e)}")
+        print(f"[EMAIL DIGEST] Traceback: {traceback.format_exc()}")
+    finally:
+        email_digest_running = False
+        print("[EMAIL DIGEST] Flag cleared, digest complete.")
+
+async def digest_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Manual trigger for email digest - for testing."""
+    user_id = update.effective_user.id
+    if not is_authorized(user_id):
+        await update.message.reply_text(f"⛔ No tienes acceso.", parse_mode="Markdown")
+        return
+    
+    await update.message.reply_text("📬 Ejecutando digest de emails...")
+    await daily_email_digest(context)
 
 if __name__ == '__main__':
     if not TOKEN or TOKEN == "your_telegram_token_here":
@@ -941,6 +979,7 @@ if __name__ == '__main__':
     new_handler = CommandHandler('new', new_conversation)
     status_handler = CommandHandler('status', status)
     unload_handler = CommandHandler('unload', unload_models)
+    digest_handler = CommandHandler('digest', digest_command)
     msg_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message)
     voice_handler = MessageHandler(filters.VOICE, handle_voice)
     audio_handler = MessageHandler(filters.AUDIO, handle_audio)
@@ -951,6 +990,7 @@ if __name__ == '__main__':
     application.add_handler(new_handler)
     application.add_handler(status_handler)
     application.add_handler(unload_handler)
+    application.add_handler(digest_handler)
     application.add_handler(msg_handler)
     application.add_handler(voice_handler)
     application.add_handler(audio_handler)
@@ -968,7 +1008,11 @@ if __name__ == '__main__':
         # Daily email digest at 4:00 AM (only runs if Gmail is configured)
         if is_gmail_configured():
             from datetime import time as dt_time
-            application.job_queue.run_daily(daily_email_digest, time=dt_time(hour=4, minute=0))
+            # Use configured timezone
+            tz_offset = get_config("TIMEZONE_OFFSET_HOURS")
+            local_tz = timezone(timedelta(hours=tz_offset))
+            application.job_queue.run_daily(daily_email_digest, time=dt_time(hour=4, minute=0, tzinfo=local_tz))
+            print(f"[EMAIL DIGEST] Job programado para las 4:00 AM (UTC{tz_offset:+d})")
     
     print("Bot is polling...")
     application.run_polling()
