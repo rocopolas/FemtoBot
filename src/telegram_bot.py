@@ -10,6 +10,9 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 import tempfile
 
+# Add parent directory to path for imports
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, PROJECT_ROOT)
 
 from src.client import OllamaClient
 from utils.cron_utils import CronUtils
@@ -139,60 +142,69 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     # Calculate tokens using tiktoken (fallback to approximation)
-    context_limit = int(get_config("CONTEXT_LIMIT", 200000))
-    history = chat_histories.get(chat_id, [])
-    
-    total_tokens = 0
-    calculation_method = "Aproximado (caracteres)"
-    
     try:
-        import tiktoken
-        # cl100k_base is used by gpt-4, llama3, etc. Good enough approximation for all modern LLMs
-        encoder = tiktoken.get_encoding("cl100k_base")
-        calculation_method = "Real (tiktoken)"
+        context_limit = int(get_config("CONTEXT_LIMIT", 200000))
+        history = chat_histories.get(chat_id, [])
         
-        for msg in history:
-            content = msg.get("content", "")
-            # Add message overhead (approx 4 tokens for role/structure)
-            total_tokens += 4
-            total_tokens += len(encoder.encode(content))
+        total_tokens = 0
+        calculation_method = "Aproximado (caracteres)"
         
-        # Add reply overhead
-        total_tokens += 3
+        try:
+            import tiktoken
+            # cl100k_base is used by gpt-4, llama3, etc. Good enough approximation for all modern LLMs
+            encoder = tiktoken.get_encoding("cl100k_base")
+            calculation_method = "Real (tiktoken)"
+            
+            for msg in history:
+                content = msg.get("content", "")
+                # Add message overhead (approx 4 tokens for role/structure)
+                total_tokens += 4
+                total_tokens += len(encoder.encode(content))
+            
+            # Add reply overhead
+            total_tokens += 3
+            
+        except ImportError:
+            # Fallback: 1 token ~= 4 chars
+            total_chars = sum(len(msg.get("content", "")) for msg in history)
+            total_tokens = total_chars // 4
         
-    except ImportError:
-        # Fallback: 1 token ~= 4 chars
-        total_chars = sum(len(msg.get("content", "")) for msg in history)
-        total_tokens = total_chars // 4
-    
-    # Calculate stats
-    usage_percent = (total_tokens / context_limit) * 100
-    if usage_percent > 100: usage_percent = 100
-    
-    remaining_tokens = max(0, context_limit - total_tokens)
-    
-    # Progress bar
-    bar_length = 20
-    filled_length = int(bar_length * usage_percent / 100)
-    filled_length = min(filled_length, bar_length)
-    bar = "█" * filled_length + "░" * (bar_length - filled_length)
-    
-    status_text = (
-        f"📊 *Estado del Bot* ({calculation_method})\n"
-        f"━━━━━━━━━━━━━━\n"
-        f"🧠 **Memoria Contextual:**\n"
-        f"`{bar}` {usage_percent:.1f}%\n"
-        f"🔢 {total_tokens:,} / {context_limit:,} tokens usados\n"
-        f"📉 {remaining_tokens:,} tokens restantes\n"
-        f"💬 {len(history)} mensajes en historial\n\n"
-        f"🔌 **Sistema:**\n"
-        f"✅ Modelo: `{get_config('MODEL')}`\n"
-        f"✅ Audio: `{get_config('WHISPER_MODEL_VOICE')}`"
-    )
+        # Calculate stats
+        usage_percent = (total_tokens / context_limit) * 100
+        if usage_percent > 100: usage_percent = 100
+        
+        remaining_tokens = max(0, context_limit - total_tokens)
+        
+        # Progress bar
+        bar_length = 20
+        filled_length = int(bar_length * usage_percent / 100)
+        filled_length = min(filled_length, bar_length)
+        bar = "█" * filled_length + "░" * (bar_length - filled_length)
+        
+        status_text = (
+            f"📊 *Estado del Bot* ({calculation_method})\n"
+            f"━━━━━━━━━━━━━━\n"
+            f"🧠 **Memoria Contextual:**\n"
+            f"`{bar}` {usage_percent:.1f}%\n"
+            f"🔢 {total_tokens:,} / {context_limit:,} tokens usados\n"
+            f"📉 {remaining_tokens:,} tokens restantes\n"
+            f"💬 {len(history)} mensajes en historial\n\n"
+            f"🔌 **Sistema:**\n"
+            f"✅ Modelo: `{get_config('MODEL')}`\n"
+            f"✅ Audio: `{get_config('WHISPER_MODEL_VOICE')}`"
+        )
 
-    await update.message.reply_text(status_text, parse_mode="Markdown")
-    
-    await update.message.reply_text(status_text, parse_mode="Markdown")
+    except Exception as e:
+        # Fallback for ANY error in calculation
+        print(f"Error in status calculation: {e}")
+        status_text = f"⚠️ Error calculando estado: {str(e)}"
+
+    try:
+        await update.message.reply_text(status_text, parse_mode="Markdown")
+    except Exception as e:
+        print(f"Markdown error in status: {e}")
+        # Fallback if markdown fails (e.g. unescaped chars)
+        await update.message.reply_text(status_text)
 
 async def unload_models(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Unloads all models from RAM."""

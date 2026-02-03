@@ -15,9 +15,9 @@ def load_config():
     
     return _config
 
-def get_config(key: str):
+def get_config(key: str, default=None):
     """Gets a config value by key."""
     global _config
     if _config is None:
         load_config()
-    return _config.get(key)
+    return _config.get(key, default)
