@@ -20,7 +20,7 @@ from utils.audio_utils import transcribe_audio, transcribe_audio_large, is_whisp
 from utils.youtube_utils import is_youtube_url, download_youtube_audio, get_video_title
 from utils.document_utils import extract_text_from_document, is_supported_document
 from utils.email_utils import is_gmail_configured, fetch_emails_last_24h, format_emails_for_llm
-from utils.wiz_utils import control_light, is_wiz_available, apply_preset, add_preset, delete_preset, list_presets
+from utils.wiz_utils import control_light, is_wiz_available
 from utils.config_loader import get_config
 
 # Load environment variables
@@ -140,32 +140,59 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"⛔ No tienes acceso.", parse_mode="Markdown")
         return
     
-    # Calculate approximate tokens (rough: 1 token ≈ 4 chars)
+    # Calculate tokens using tiktoken (fallback to approximation)
+    context_limit = int(get_config("CONTEXT_LIMIT", 200000))
     history = chat_histories.get(chat_id, [])
-    total_chars = sum(len(msg.get("content", "")) for msg in history)
-    approx_tokens = total_chars // 4
     
-    # Calculate remaining
-    remaining_tokens = max(0, MODEL_CONTEXT_SIZE - approx_tokens)
-    usage_percent = min(100, (approx_tokens / MODEL_CONTEXT_SIZE) * 100)
+    total_tokens = 0
+    calculation_method = "Aproximado (caracteres)"
+    
+    try:
+        import tiktoken
+        # cl100k_base is used by gpt-4, llama3, etc. Good enough approximation for all modern LLMs
+        encoder = tiktoken.get_encoding("cl100k_base")
+        calculation_method = "Real (tiktoken)"
+        
+        for msg in history:
+            content = msg.get("content", "")
+            # Add message overhead (approx 4 tokens for role/structure)
+            total_tokens += 4
+            total_tokens += len(encoder.encode(content))
+        
+        # Add reply overhead
+        total_tokens += 3
+        
+    except ImportError:
+        # Fallback: 1 token ~= 4 chars
+        total_chars = sum(len(msg.get("content", "")) for msg in history)
+        total_tokens = total_chars // 4
+    
+    # Calculate stats
+    usage_percent = (total_tokens / context_limit) * 100
+    if usage_percent > 100: usage_percent = 100
+    
+    remaining_tokens = max(0, context_limit - total_tokens)
     
     # Progress bar
-    bar_filled = int(usage_percent / 5)
-    bar_empty = 20 - bar_filled
-    progress_bar = "█" * bar_filled + "░" * bar_empty
+    bar_length = 20
+    filled_length = int(bar_length * usage_percent / 100)
+    filled_length = min(filled_length, bar_length)
+    bar = "█" * filled_length + "░" * (bar_length - filled_length)
     
-    status_text = f"""📊 *Estado del Bot*
+    status_text = (
+        f"📊 *Estado del Bot* ({calculation_method})\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"🧠 **Memoria Contextual:**\n"
+        f"`{bar}` {usage_percent:.1f}%\n"
+        f"🔢 {total_tokens:,} / {context_limit:,} tokens usados\n"
+        f"📉 {remaining_tokens:,} tokens restantes\n"
+        f"💬 {len(history)} mensajes en historial\n\n"
+        f"🔌 **Sistema:**\n"
+        f"✅ Modelo: `{get_config('MODEL')}`\n"
+        f"✅ Audio: `{get_config('WHISPER_MODEL_VOICE')}`"
+    )
 
-*Modelo:* `{MODEL}`
-*Mensajes en historial:* {len(history)}
-
-*Uso de contexto:*
-`[{progress_bar}]` {usage_percent:.1f}%
-
-*Tokens aproximados:* ~{approx_tokens:,} / {MODEL_CONTEXT_SIZE:,}
-*Tokens restantes:* ~{remaining_tokens:,}
-
-_Nota: Los tokens son aproximados (1 token ≈ 4 caracteres)_"""
+    await update.message.reply_text(status_text, parse_mode="Markdown")
     
     await update.message.reply_text(status_text, parse_mode="Markdown")
 
@@ -697,10 +724,6 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
             final_formatted = re.sub(r':::cron\s+.+?:::', '', final_formatted)
             final_formatted = re.sub(r':::luz\s+.+?:::', '', final_formatted)
             final_formatted = re.sub(r':::camara(?:\s+\S+)?:::', '', final_formatted)
-            final_formatted = re.sub(r':::modo\s+.+?:::', '', final_formatted)
-            final_formatted = re.sub(r':::modo_guardar\s+.+?:::', '', final_formatted, flags=re.DOTALL)
-            final_formatted = re.sub(r':::modo_borrar\s+.+?:::', '', final_formatted)
-            final_formatted = re.sub(r':::modo_listar:::', '', final_formatted)
             final_formatted = final_formatted.strip()
             
             try:
@@ -722,10 +745,6 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
             formatted_response = re.sub(r':::cron\s+.+?:::', '', formatted_response)
             formatted_response = re.sub(r':::luz\s+.+?:::', '', formatted_response)
             formatted_response = re.sub(r':::camara(?:\s+\S+)?:::', '', formatted_response)
-            formatted_response = re.sub(r':::modo\s+.+?:::', '', formatted_response)
-            formatted_response = re.sub(r':::modo_guardar\s+.+?:::', '', formatted_response, flags=re.DOTALL)
-            formatted_response = re.sub(r':::modo_borrar\s+.+?:::', '', formatted_response)
-            formatted_response = re.sub(r':::modo_listar:::', '', formatted_response)
             
             final_text = formatted_response.strip()
             
@@ -821,35 +840,6 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
             
             result = await control_light(luz_name, luz_action, luz_value)
             await context.bot.send_message(chat_id, result)
-
-        # 8. Light Modes - :::modo nombre:::
-        for modo_match in re.finditer(r":::modo\s+(\S+)(?:\s+(\S+))?:::", full_response):
-            modo_name = modo_match.group(1).strip()
-            result = await apply_preset(modo_name)
-            await context.bot.send_message(chat_id, result)
-
-        # 9. List Modes - :::modo_listar:::
-        if ":::modo_listar:::" in full_response:
-            result = list_presets()
-            await context.bot.send_message(chat_id, result)
-
-        # 10. Delete Mode - :::modo_borrar nombre:::
-        for del_match in re.finditer(r":::modo_borrar\s+(\S+):::", full_response):
-            del_name = del_match.group(1).strip()
-            result = delete_preset(del_name)
-            await context.bot.send_message(chat_id, result)
-            
-        # 11. Save Mode - :::modo_guardar nombre json:::
-        for save_match in re.finditer(r":::modo_guardar\s+(\S+)\s+(.+?):::", full_response, re.DOTALL):
-            save_name = save_match.group(1).strip()
-            save_json = save_match.group(2).strip()
-            try:
-                import json
-                save_data = json.loads(save_json)
-                result = add_preset(save_name, save_data)
-                await context.bot.send_message(chat_id, result)
-            except Exception as e:
-                await context.bot.send_message(chat_id, f"❌ Error guardando modo '{save_name}': Formato inválido.\n{str(e)}")
                  
     except Exception as e:
         # Fallback for main loop errors

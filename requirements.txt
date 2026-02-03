@@ -41,7 +41,7 @@ typer-slim==0.21.1
 typing_extensions==4.15.0
 tzlocal==5.3.1
 uc-micro-py==1.0.3
-yt-dlp==2023.11.16
+yt-dlp
 pyyaml
 pymupdf
 python-docx

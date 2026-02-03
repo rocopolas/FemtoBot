@@ -38,8 +38,11 @@ async def download_youtube_audio(url: str) -> str:
             'preferredquality': '128',
         }],
         'outtmpl': os.path.join(temp_dir, 'audio.%(ext)s'),
-        'quiet': True,
-        'no_warnings': True,
+        'quiet': False, # Changed to see errors in logs
+        'no_warnings': False,
+        'nocheckcertificate': True,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        # 'cookiesfrombrowser': ('chrome',), # Optional: enable if user has cookies
     }
     
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:

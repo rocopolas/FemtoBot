@@ -115,21 +115,5 @@ Acciones Luz:
 - `:::luz pieza color rojo:::`
 - `:::luz todas apagar:::`
 
-Modos de Iluminación (Escenas):
-- `:::modo LISTAR:::` Muestra los modos disponibles.
-- `:::modo NOMBRE:::` Activa un modo (ej: `:::modo dormir:::`)
-
-Creación Dinámica de Modos:
-Si el usuario pide crear un modo (ej: "crear modo lectura con luz cálida al 80%"), usa:
-`:::modo_guardar NOMBRE JSON_LISTA:::`
-
-Formato JSON: Lista de objetos con `light`, `action` (encender/apagar), `color` (opcional), `brightness` (opcional).
-Ejemplo "modo lectura": 
-`:::modo_guardar lectura [{"light":"pieza","action":"encender","color":"calido","brightness":80}, {"light":"otra_luz","action":"apagar"}]:::`
-
-Gestión:
-- `:::modo_borrar NOMBRE:::` Elimina un modo.
-- `:::modo_listar:::` Lista modos guardados.
-
 Colores: rojo, verde, azul, amarillo, naranja, rosa, morado, violeta, celeste, blanco, calido, frio
 
