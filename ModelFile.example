@@ -1,4 +1,4 @@
-FROM glm-4.7-flash:latest
+FROM llama3.1:latest
 
-PARAMETER num_ctx 200000
-PARAMETER temperature = 0.1
+PARAMETER num_ctx 9000
+PARAMETER temperature 0.3

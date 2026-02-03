@@ -1,7 +1,7 @@
 # ═══════════════════════════════════════════════════════════════
 #                    LOCALBOT - CONFIGURACIÓN
 # ═══════════════════════════════════════════════════════════════
-MODEL: "glm-localbot"
+MODEL: "ollama-localbot:latest"
 VISION_MODEL: "qwen3-vl:2b"
 CONTEXT_LIMIT: 200000
 WHISPER_LANGUAGE: "es"
