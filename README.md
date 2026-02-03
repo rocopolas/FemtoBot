@@ -158,8 +158,9 @@ python src/main.py
 - Send a voice message → Transcribed and answered
 - Send an audio file → Transcription only (larger model)
 
-### YouTube Summary
-- Send a YouTube link → Bot downloads, transcribes and summarizes
+### YouTube Summary & Download
+- Send a YouTube link → Bot downloads, transcribes and summarizes (Default)
+- Send link + "download" → Bot sends you the video file
 
 ### Twitter/X Media Download
 - Send a Twitter/X link and ask to "download" or "bajar"

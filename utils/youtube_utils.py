@@ -64,3 +64,39 @@ def get_video_title(url: str) -> str:
             return info.get('title', 'Video')
     except:
         return "Video"
+
+async def download_youtube_video(url: str) -> str:
+    """
+    Downloads video from YouTube.
+    Returns the path to the downloaded mp4 file.
+    """
+    try:
+        import yt_dlp
+    except ImportError:
+        raise RuntimeError("yt-dlp no instalado.")
+        
+    temp_dir = tempfile.mkdtemp()
+    
+    ydl_opts = {
+        'format': 'best[ext=mp4]/best', # Try to get mp4 directly
+        'outtmpl': os.path.join(temp_dir, 'video.%(ext)s'),
+        'quiet': True,
+        'nocheckcertificate': True,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    }
+    
+    import asyncio
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, lambda: _download_video_sync(url, ydl_opts))
+    
+    # Find file
+    for f in os.listdir(temp_dir):
+        if f.endswith('.mp4') or f.endswith('.mkv') or f.endswith('.webm'):
+            return os.path.join(temp_dir, f)
+            
+    raise RuntimeError("No se pudo descargar el video")
+
+def _download_video_sync(url, opts):
+    import yt_dlp
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        ydl.download([url])

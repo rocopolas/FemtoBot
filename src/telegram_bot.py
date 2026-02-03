@@ -18,7 +18,7 @@ from src.client import OllamaClient
 from utils.cron_utils import CronUtils
 from utils.search_utils import BraveSearch
 from utils.audio_utils import transcribe_audio, transcribe_audio_large, is_whisper_available
-from utils.youtube_utils import is_youtube_url, download_youtube_audio, get_video_title
+from utils.youtube_utils import is_youtube_url, download_youtube_audio, get_video_title, download_youtube_video
 from utils.document_utils import extract_text_from_document, is_supported_document
 from utils.email_utils import is_gmail_configured, fetch_emails_last_24h, format_emails_for_llm
 from utils.wiz_utils import control_light, is_wiz_available
@@ -679,6 +679,33 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
     # Check for YouTube URL
     youtube_url = is_youtube_url(user_text)
     if youtube_url:
+        # Check download intent
+        keywords = ["descarga", "baja", "video", "multimedia", "bajar", "guardar", "sacar", "download", "save", "get", "fetch"] # Reuse keywords
+        should_download = any(k in user_text.lower() for k in keywords)
+
+        if should_download:
+            status_msg = await context.bot.send_message(chat_id, "🎥 Analizando video de YouTube...")
+            try:
+                video_path = await download_youtube_video(youtube_url)
+                if video_path:
+                    await context.bot.send_chat_action(chat_id=chat_id, action="upload_video")
+                    await status_msg.edit_text("📤 Subiendo video...")
+                    
+                    with open(video_path, 'rb') as f:
+                        await context.bot.send_video(chat_id, video=f)
+                        
+                    # Cleanup
+                    try:
+                        os.unlink(video_path)
+                        os.rmdir(os.path.dirname(video_path))
+                    except: pass
+                    
+                    await status_msg.delete()
+                    return
+            except Exception as e:
+                await status_msg.edit_text(f"❌ Error con YouTube: {str(e)}")
+                return
+
         try:
             # Send status
             status_msg = await context.bot.send_message(chat_id, "🎥 Descargando audio del video...")
