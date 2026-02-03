@@ -2,23 +2,6 @@
 
 A smart personal assistant that runs locally using [Ollama](https://ollama.ai). Available as a Telegram bot and TUI interface.
 
-## 🤔 ¿Por qué LocalBot?
-
-| | LocalBot | Cloud Bots (Claude, GPT) |
-|---|---|---|
-| 💰 **Costo** | **Gratis** | $20+/mes o pago por uso |
-| 🔒 **Privacidad** | Tus datos nunca salen de tu PC | Tus chats van a servidores externos |
-| ⚡ **Velocidad** | Modelos pequeños = respuestas instantáneas | Depende de la API y tu plan |
-| 🌐 **Internet** | Funciona offline | Requiere conexión constante |
-| 🎛️ **Control** | Tú eliges el modelo, contexto, y todo | Limitado a lo que ofrecen |
-| 🏠 **Smart Home** | Controla tus luces, todo local | No disponible |
-
-**Ideal para:**
-- Usar modelos pequeños y rápidos (7B-14B params)
-- Mantener tu privacidad al 100%
-- No pagar suscripciones mensuales
-- Tener un asistente personal que corre en TU hardware
-
 ## ✨ Features
 
 - 💬 **Local LLM chat** - No external API dependencies
@@ -31,6 +14,23 @@ A smart personal assistant that runs locally using [Ollama](https://ollama.ai). 
 - ⏰ **Reminders** - Schedule cron tasks that notify you in chat
 - 🧠 **Persistent memory** - The bot remembers information about you
 - 💡 **Smart lights** - Control WIZ lights via chat
+
+## 🤔 Why LocalBot?
+
+| | LocalBot | Cloud Bots (Claude, GPT) |
+|---|---|---|
+| 💰 **Cost** | **Free** | $20+/month or pay per use |
+| 🔒 **Privacy** | Your data never leaves your PC | Your chats go to external servers |
+| ⚡ **Speed** | Small models = instant responses | Depends on API and your plan |
+| 🌐 **Internet** | Works offline | Requires constant connection |
+| 🎛️ **Control** | You choose model, context, everything | Limited to what they offer |
+| 🏠 **Smart Home** | Control your lights, all local | Not available |
+
+**Ideal for:**
+- Using small and fast models (7B-14B params)
+- Keeping your privacy at 100%
+- Not paying monthly subscriptions
+- Having a personal assistant that runs on YOUR hardware
 
 ## 📁 Structure
 
@@ -49,9 +49,13 @@ LocalBot/
 │
 ├── utils/               # Utility modules
 │   ├── audio_utils.py   # Whisper transcription
-│   ├── youtube_utils.py # Download YT audio
+│   ├── youtube_utils.py # YouTube audio download
 │   ├── search_utils.py  # Brave search
-│   └── cron_utils.py    # Crontab management
+│   ├── cron_utils.py    # Crontab management
+│   ├── document_utils.py # PDF/DOCX extraction
+│   ├── email_utils.py   # Gmail integration
+│   ├── wiz_utils.py     # WIZ smart lights
+│   └── config_loader.py # YAML config loader
 │
 ├── data/                # Data files
 │   ├── instructions.md  # LLM instructions
