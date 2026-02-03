@@ -95,7 +95,7 @@ cp .env.example .env
 
 4. **Download Ollama model:**
 ```bash
-ollama pull glm-4.7-flash:q8_0
+ollama pull llama3.1:latest
 # Or your preferred model
 ```
 
@@ -113,7 +113,7 @@ GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
 
 ### `config.yaml`
 ```yaml
-MODEL: "glm-4.7-flash:q8_0"
+MODEL: "llama3.1:latest"
 VISION_MODEL: "qwen3-vl:2b"
 CONTEXT_LIMIT: 200000
 WHISPER_LANGUAGE: "es"
