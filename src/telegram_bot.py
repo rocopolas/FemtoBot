@@ -619,6 +619,8 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
         if system_prompt:
             chat_histories[chat_id].append({"role": "system", "content": system_prompt})
 
+    placeholder_msg = None # Initialize placeholder to reuse for YouTube status
+
     # Check for YouTube URL
     youtube_url = is_youtube_url(user_text)
     if youtube_url:
@@ -644,16 +646,17 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
             except:
                 pass
             
-            # Replace user_text with summarization request
-            user_text = f"Resume el siguiente video de YouTube titulado '{video_title}':\n\n{transcription}"
+            # Replace user_text with STRONG summarization request
+            user_text = (
+                f"Analiza la siguiente transcripción del video de YouTube '{video_title}':\n\n"
+                f"\"\"\"\n{transcription}\n\"\"\"\n\n"
+                f"INSTRUCCIÓN: Haz un resumen detallado y estructurado del contenido del video anterior."
+            )
             
             await status_msg.edit_text(f"📝 Resumiendo: _{video_title}_...", parse_mode="Markdown")
             
-            # Delete status after a bit (will be replaced by LLM response)
-            try:
-                await status_msg.delete()
-            except:
-                pass
+            # Keep this message to be updated with the response
+            placeholder_msg = status_msg
                 
         except Exception as e:
             await context.bot.send_message(chat_id, f"❌ Error procesando video: {str(e)}")
@@ -676,14 +679,15 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
     full_response = ""
     
     # Use reply_to if there are pending messages in queue
-    if use_reply:
-        placeholder_msg = await context.bot.send_message(
-            chat_id=chat_id,
-            text="...",
-            reply_to_message_id=message_id
-        )
-    else:
-        placeholder_msg = await update.message.reply_text("...")
+    if placeholder_msg is None:
+        if use_reply:
+            placeholder_msg = await context.bot.send_message(
+                chat_id=chat_id,
+                text="...",
+                reply_to_message_id=message_id
+            )
+        else:
+            placeholder_msg = await update.message.reply_text("...")
     
     try:
         async for chunk in client.stream_chat(MODEL, chat_histories[chat_id]):
