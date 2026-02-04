@@ -4,6 +4,7 @@ import sys
 import asyncio
 import logging
 import base64
+import httpx
 from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 from telegram import Update
@@ -235,6 +236,42 @@ def escape_markdown(text: str) -> str:
     escape_chars = r'_*[]()~`>#+-=|{}.!'
     return re.sub(f'([{re.escape(escape_chars)}])', r'\\\1', text)
 
+def prune_history(history, max_tokens=30000):
+    """
+    Prunes chat history to keep estimated token usage below limit.
+    Preserves system prompt and prioritizes recent messages.
+    """
+    # Estimate 1 token ~= 4 chars (rough fast check)
+    current_chars = sum(len(m['content']) for m in history)
+    limit_chars = max_tokens * 4
+    
+    if current_chars <= limit_chars:
+        return history
+        
+    # Split system and others
+    system_msgs = [msg for msg in history if msg['role'] == 'system']
+    other_msgs = [msg for msg in history if msg['role'] != 'system']
+    
+    # Calculate system usage
+    system_chars = sum(len(m['content']) for m in system_msgs)
+    budget = limit_chars - system_chars
+    
+    if budget <= 0:
+        return system_msgs # Should not happen unless system prompt is huge
+        
+    kept_msgs = []
+    current_usage = 0
+    
+    # Take from end (most recent first)
+    for msg in reversed(other_msgs):
+        msg_len = len(msg['content'])
+        if current_usage + msg_len > budget:
+            break
+        kept_msgs.append(msg)
+        current_usage += msg_len
+        
+    return system_msgs + list(reversed(kept_msgs))
+
 async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles voice messages by transcribing and processing them."""
     print(f"[DEBUG] handle_voice called")
@@ -429,7 +466,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Generate response with text model
         full_response = ""
-        async for chunk in client.stream_chat(MODEL, chat_histories[chat_id]):
+        async for chunk in client.stream_chat(MODEL, prune_history(chat_histories[chat_id], get_config("CONTEXT_LIMIT", 30000))):
             full_response += chunk
         
         # Format response and strip commands
@@ -437,6 +474,8 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         formatted_response = re.sub(r'\x1b\[[0-9;]*m', '', formatted_response)
         formatted_response = re.sub(r':::memory\s+.+?:::', '', formatted_response, flags=re.DOTALL)
         formatted_response = re.sub(r':::memory_delete\s+.+?:::', '', formatted_response, flags=re.DOTALL)
+        formatted_response = re.sub(r':::foto\s+.+?:::', '', formatted_response, flags=re.IGNORECASE)
+        formatted_response = re.sub(r':::luz\s+.+?:::', '', formatted_response, flags=re.IGNORECASE)
         formatted_response = formatted_response.strip()
         
         try:
@@ -534,7 +573,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Generate response
         client = OllamaClient()
         full_response = ""
-        async for chunk in client.stream_chat(MODEL, chat_histories[chat_id]):
+        async for chunk in client.stream_chat(MODEL, prune_history(chat_histories[chat_id], get_config("CONTEXT_LIMIT", 30000))):
             full_response += chunk
         
         # Format response and strip commands
@@ -542,6 +581,8 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         formatted_response = re.sub(r'\x1b\[[0-9;]*m', '', formatted_response)
         formatted_response = re.sub(r':::memory\s+.+?:::', '', formatted_response, flags=re.DOTALL)
         formatted_response = re.sub(r':::memory_delete\s+.+?:::', '', formatted_response, flags=re.DOTALL)
+        formatted_response = re.sub(r':::foto\s+.+?:::', '', formatted_response, flags=re.IGNORECASE)
+        formatted_response = re.sub(r':::luz\s+.+?:::', '', formatted_response, flags=re.IGNORECASE)
         formatted_response = formatted_response.strip()
         
         try:
@@ -772,7 +813,11 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
             placeholder_msg = await update.message.reply_text("...")
     
     try:
-        async for chunk in client.stream_chat(MODEL, chat_histories[chat_id]):
+        # Prune context to avoid infinite growth
+        pruned_history = prune_history(chat_histories[chat_id], get_config("CONTEXT_LIMIT", 30000))
+
+        async for chunk in client.stream_chat(MODEL, pruned_history):
+
             full_response += chunk
             pass
             
@@ -793,7 +838,7 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
             
             # Get final response from LLM
             final_response = ""
-            async for chunk in client.stream_chat(MODEL, chat_histories[chat_id]):
+            async for chunk in client.stream_chat(MODEL, prune_history(chat_histories[chat_id], get_config("CONTEXT_LIMIT", 30000))):
                 final_response += chunk
             
             # CRITICAL: Update full_response so command parsers see the new text
@@ -829,7 +874,9 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
             formatted_response = re.sub(r':::memory_delete\s+.+?:::', '', formatted_response, flags=re.DOTALL)
             formatted_response = re.sub(r':::cron_delete\s+.+?:::', '', formatted_response)
             formatted_response = re.sub(r':::cron\s+.+?:::', '', formatted_response)
-            formatted_response = re.sub(r':::luz\s+.+?:::', '', formatted_response)
+            formatted_response = re.sub(r':::foto\s+.+?:::', '', formatted_response, flags=re.IGNORECASE)
+            formatted_response = re.sub(r':::luz\s+.+?:::', '', formatted_response, flags=re.IGNORECASE)
+
             formatted_response = re.sub(r':::camara(?:\s+\S+)?:::', '', formatted_response)
             
             final_text = formatted_response.strip()
@@ -869,6 +916,12 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
             
             if command.endswith(":"):
                command = command[:-1].strip()
+
+            # Automatic redirection for notifications (simplifies LLM/User instruction)
+            # If the command is an echo and doesn't have a redirection, append one to EVENTS_FILE
+            if "echo" in command and ">>" not in command:
+                 # Ensure we use the configured absolute path
+                 command += f" >> {EVENTS_FILE}"
             
             # Escape for display
             sched_esc = schedule.replace("_", "\\_").replace("*", "\\*")
@@ -926,6 +979,61 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
             
             result = await control_light(luz_name, luz_action, luz_value)
             await context.bot.send_message(chat_id, result)
+
+        # 6. Image Search Command - :::foto QUERY:::
+        for foto_match in re.finditer(r":::foto\s+(.+?):::", full_response, re.IGNORECASE):
+            query = foto_match.group(1).strip()
+            if query:
+                status_msg = await context.bot.send_message(chat_id, f"🔍 Buscando imágenes de '_{query}_'...", parse_mode="Markdown")
+                try:
+                    # 1. Search
+                    image_urls = await BraveSearch.search_images(query, count=6)
+                    if not image_urls:
+                        await status_msg.edit_text(f"❌ No encontré imágenes de '{query}'.")
+                        continue
+
+                    # 2. Validate loop
+                    found_valid = False
+                    vision_model = get_config("VISION_MODEL")
+                    client = OllamaClient()
+                    
+                    for i, url in enumerate(image_urls):
+                        await status_msg.edit_text(f"👁️ Analizando candidata {i+1}/{len(image_urls)}...")
+                        try:
+                            # Download to memory
+                            async with httpx.AsyncClient() as http_client:
+                                resp = await http_client.get(url, timeout=10.0, follow_redirects=True)
+                                if resp.status_code != 200: continue
+                                img_data = resp.content
+                            
+                            # Encode for Ollama
+                            img_b64 = base64.b64encode(img_data).decode('utf-8')
+                            
+                            # Vision Check
+                            prompt = (f"Does this image clearly show '{query}'? "
+                                      "Answer with YES or NO first. If uncertain, say NO.")
+                            
+                            vision_response = await client.describe_image(vision_model, img_b64, prompt)
+                            print(f"[VISION VALIDATION] URL: {url} | RESPONSE: {vision_response}")
+                            
+                            clean_resp = vision_response.lower().strip()
+                            is_valid = clean_resp.startswith("yes") or "yes" in clean_resp[:15] or "sí" in clean_resp[:15]
+                            
+                            if is_valid:
+                                await context.bot.send_chat_action(chat_id=chat_id, action="upload_photo")
+                                await status_msg.edit_text("✅ Imagen verificada. Subiendo...")
+                                await context.bot.send_photo(chat_id, photo=img_data, caption=f"📸 {query}")
+                                await status_msg.delete()
+                                found_valid = True
+                                break
+                        except Exception as e:
+                            print(f"[Image Search Loop Error] {e}")
+                            continue
+                    
+                    if not found_valid:
+                        await status_msg.edit_text(f"❌ Busqué {len(image_urls)} imágenes pero el modelo visual no aprobó ninguna para '{query}'.")
+                except Exception as e:
+                    await status_msg.edit_text(f"❌ Error buscando imagen: {str(e)}")
                  
     except Exception as e:
         # Fallback for main loop errors

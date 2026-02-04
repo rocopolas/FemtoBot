@@ -166,6 +166,12 @@ python src/main.py
 - Send a Twitter/X link and ask to "download" or "bajar"
 - The bot will download the video/image and send the file to you
 
+### 🔍 Smart Image Search
+- Ask: "Give me a photo of [something]" or "Search for an image of [something]"
+- The **LLM decides** to search for an image and uses the command `:::foto...:::`.
+- The bot searches Brave Images, then uses its **Vision Model** to look at the candidates.
+- It only sends the image if the AI confirms it matches your request!
+
 ### Document Reading
 - Send a PDF, DOCX, or TXT file → Bot extracts text and responds
 - Send document + caption → Bot considers both for response

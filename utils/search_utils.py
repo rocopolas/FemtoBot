@@ -59,3 +59,39 @@ class BraveSearch:
             return f"[Error de búsqueda: {e.response.status_code}]"
         except Exception as e:
             return f"[Error de búsqueda: {str(e)}]"
+
+    @staticmethod
+    async def search_images(query: str, count: int = 5) -> list[str]:
+        """
+        Searches for images using Brave Search API.
+        Returns a list of image URLs.
+        """
+        if not BRAVE_API_KEY:
+            return []
+        
+        url = "https://api.search.brave.com/res/v1/images/search"
+        headers = {
+            "Accept": "application/json",
+            "X-Subscription-Token": BRAVE_API_KEY
+        }
+        params = {"q": query, "count": count}
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, headers=headers, params=params, timeout=10.0)
+                response.raise_for_status()
+                data = response.json()
+                
+                results = data.get("results", [])
+                image_urls = []
+                for result in results:
+                    # 'properties' -> 'url' is the image source
+                    img_url = result.get("properties", {}).get("url")
+                    if img_url:
+                        image_urls.append(img_url)
+                        
+                return image_urls[:count]
+                
+        except Exception as e:
+            print(f"[Brave Images] Error: {e}")
+            return []
