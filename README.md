@@ -15,6 +15,7 @@ A smart personal assistant that runs locally using [Ollama](https://ollama.ai). 
 - ⏰ **Reminders** - Schedule cron tasks that notify you in chat
 - 🧠 **Persistent memory** - The bot remembers information about you
 - 💡 **Smart lights** - Control WIZ lights via chat
+- 🖼️ **Image search** - Search for images on the web
 
 ## 🤔 Why LocalBot?
 
