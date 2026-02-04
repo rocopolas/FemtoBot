@@ -25,6 +25,7 @@ from utils.email_utils import is_gmail_configured, fetch_emails_last_24h, format
 from utils.wiz_utils import control_light, is_wiz_available
 from utils.twitter_utils import is_twitter_url, download_twitter_video, get_twitter_media_url
 from utils.config_loader import get_config
+from utils.telegram_utils import split_message
 
 # Load environment variables
 load_dotenv()
@@ -230,6 +231,20 @@ async def unload_models(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await status_msg.edit_text("✅ Modelos descargados de RAM.")
 
+async def restart_bot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Restarts the bot process."""
+    user_id = update.effective_user.id
+    
+    if not is_authorized(user_id):
+        await update.message.reply_text(f"⛔ No tienes acceso.", parse_mode="Markdown")
+        return
+
+    await update.message.reply_text("🔄 Reiniciando bot...")
+    
+    # Restart the process
+    # os.execl replaces the current process with a new one
+    os.execl(sys.executable, sys.executable, *sys.argv)
+
 
 def escape_markdown(text: str) -> str:
     """Helper to escape Markdown special characters for Telegram."""
@@ -328,10 +343,22 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if is_external:
             # External: just show transcription, don't process with LLM
-            await status_msg.edit_text(f"📝 *Transcripción (audio externo):*\n\n{transcription}", parse_mode="Markdown")
+            text = f"📝 *Transcripción (audio externo):*\n\n{transcription}"
+            chunks = split_message(text)
+            for i, chunk in enumerate(chunks):
+                if i == 0:
+                    await status_msg.edit_text(chunk, parse_mode="Markdown")
+                else:
+                    await context.bot.send_message(chat_id, chunk, parse_mode="Markdown")
         else:
             # Direct voice: show transcription and process with LLM
-            await status_msg.edit_text(f"🎙️ *Transcripción:*\n_{transcription}_", parse_mode="Markdown")
+            text = f"🎙️ *Transcripción:*\n_{transcription}_"
+            chunks = split_message(text)
+            for i, chunk in enumerate(chunks):
+                if i == 0:
+                    await status_msg.edit_text(chunk, parse_mode="Markdown")
+                else:
+                    await context.bot.send_message(chat_id, chunk, parse_mode="Markdown")
             
             # Add to queue with transcription text (4th element)
             needs_reply = not message_queue.empty()
@@ -387,7 +414,13 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
         
         # Show transcription only (no LLM processing)
-        await status_msg.edit_text(f"📝 *Transcripción de* `{file_name}`:\n\n{transcription}", parse_mode="Markdown")
+        text = f"📝 *Transcripción de* `{file_name}`:\n\n{transcription}"
+        chunks = split_message(text)
+        for i, chunk in enumerate(chunks):
+            if i == 0:
+                await status_msg.edit_text(chunk, parse_mode="Markdown")
+            else:
+                await context.bot.send_message(chat_id, chunk, parse_mode="Markdown")
             
     except Exception as e:
         await status_msg.edit_text(f"❌ Error: {str(e)}")
@@ -405,8 +438,11 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Get vision model from config
     vision_model = get_config("VISION_MODEL")
     if not vision_model:
-        await update.message.reply_text("⚠️ Modelo de visión no configurado en config.yaml")
-        return
+        # Fallback to main model if vision model is not set
+        vision_model = MODEL
+        # We assume the main model is multimodal if no specific vision model is set
+        # await update.message.reply_text("⚠️ Modelo de visión no configurado en config.yaml")
+        # return
     
     status_msg = await update.message.reply_text("🔍 Analizando imagen...")
     
@@ -444,7 +480,9 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         image_description = await client.describe_image(vision_model, image_base64, vision_prompt)
         
         # Unload vision model to free RAM
-        await client.unload_model(vision_model)
+        # Unload vision model to free RAM only if it's different from the main model
+        if vision_model != MODEL:
+            await client.unload_model(vision_model)
         
         await status_msg.edit_text("💭 Procesando respuesta...")
         
@@ -585,10 +623,19 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         formatted_response = re.sub(r':::luz\s+.+?:::', '', formatted_response, flags=re.IGNORECASE)
         formatted_response = formatted_response.strip()
         
-        try:
-            await status_msg.edit_text(formatted_response, parse_mode="Markdown")
-        except Exception:
-            await status_msg.edit_text(formatted_response)
+        # Split and send chunks
+        chunks = split_message(formatted_response)
+        for i, chunk in enumerate(chunks):
+            try:
+                if i == 0:
+                    await status_msg.edit_text(chunk, parse_mode="Markdown")
+                else:
+                    await context.bot.send_message(chat_id, chunk, parse_mode="Markdown")
+            except Exception:
+                if i == 0:
+                    await status_msg.edit_text(chunk)
+                else:
+                    await context.bot.send_message(chat_id, chunk)
         
         # Add to history
         chat_histories[chat_id].append({"role": "assistant", "content": full_response})
@@ -857,10 +904,20 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
             final_formatted = re.sub(r':::camara(?:\s+\S+)?:::', '', final_formatted)
             final_formatted = final_formatted.strip()
             
-            try:
-                await placeholder_msg.edit_text(final_formatted, parse_mode="Markdown")
-            except Exception:
-                await placeholder_msg.edit_text(final_formatted)
+            # Split and send chunks
+            chunks = split_message(final_formatted)
+            for i, chunk in enumerate(chunks):
+                try:
+                    if i == 0:
+                        await placeholder_msg.edit_text(chunk, parse_mode="Markdown")
+                    else:
+                        await context.bot.send_message(chat_id, chunk, parse_mode="Markdown")
+                except Exception:
+                    # Fallback
+                    if i == 0:
+                        await placeholder_msg.edit_text(chunk)
+                    else:
+                        await context.bot.send_message(chat_id, chunk)
             
             chat_histories[chat_id].append({"role": "assistant", "content": final_response})
             # Skip to cron parsing (search already handled)
@@ -881,6 +938,8 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
             
             final_text = formatted_response.strip()
             
+            final_text = formatted_response.strip()
+            
             # If after stripping commands the message is empty, delete placeholder
             if not final_text:
                 try:
@@ -888,10 +947,19 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
                 except:
                     pass
             else:
-                try:
-                    await placeholder_msg.edit_text(final_text, parse_mode="Markdown")
-                except Exception:
-                    await placeholder_msg.edit_text(final_text)
+                chunks = split_message(final_text)
+                for i, chunk in enumerate(chunks):
+                    try:
+                        if i == 0:
+                            await placeholder_msg.edit_text(chunk, parse_mode="Markdown")
+                        else:
+                            await context.bot.send_message(chat_id, chunk, parse_mode="Markdown")
+                    except Exception:
+                        # Fallback
+                        if i == 0:
+                            await placeholder_msg.edit_text(chunk)
+                        else:
+                            await context.bot.send_message(chat_id, chunk)
             
             # Append to history
             chat_histories[chat_id].append({"role": "assistant", "content": full_response})
@@ -1177,11 +1245,15 @@ Si no hay nada importante, dilo brevemente.
         
         # Send digest
         print("[EMAIL DIGEST] Sending message to Telegram...")
-        await context.bot.send_message(
-            notification_chat_id,
-            f"📬 **Resumen de emails (últimas 24h)**\n\n{formatted}",
-            parse_mode="Markdown"
-        )
+        digest_text = f"📬 **Resumen de emails (últimas 24h)**\n\n{formatted}"
+        
+        chunks = split_message(digest_text)
+        for chunk in chunks:
+            await context.bot.send_message(
+                notification_chat_id,
+                chunk,
+                parse_mode="Markdown"
+            )
         
         # Unload model after use
         await client.unload_model(MODEL)
@@ -1220,6 +1292,7 @@ if __name__ == '__main__':
     new_handler = CommandHandler('new', new_conversation)
     status_handler = CommandHandler('status', status)
     unload_handler = CommandHandler('unload', unload_models)
+    restart_handler = CommandHandler('restart', restart_bot)
     digest_handler = CommandHandler('digest', digest_command)
     msg_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message)
     voice_handler = MessageHandler(filters.VOICE, handle_voice)
@@ -1231,6 +1304,7 @@ if __name__ == '__main__':
     application.add_handler(new_handler)
     application.add_handler(status_handler)
     application.add_handler(unload_handler)
+    application.add_handler(restart_handler)
     application.add_handler(digest_handler)
     application.add_handler(msg_handler)
     application.add_handler(voice_handler)
