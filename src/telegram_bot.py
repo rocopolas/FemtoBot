@@ -864,9 +864,7 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
         pruned_history = prune_history(chat_histories[chat_id], get_config("CONTEXT_LIMIT", 30000))
 
         async for chunk in client.stream_chat(MODEL, pruned_history):
-
             full_response += chunk
-            pass
             
         # --- Check for Search Command BEFORE displaying ---
         search_match = re.search(r":::search\s+(.+?):::", full_response)
@@ -935,8 +933,6 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
             formatted_response = re.sub(r':::luz\s+.+?:::', '', formatted_response, flags=re.IGNORECASE)
 
             formatted_response = re.sub(r':::camara(?:\s+\S+)?:::', '', formatted_response)
-            
-            final_text = formatted_response.strip()
             
             final_text = formatted_response.strip()
             

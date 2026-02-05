@@ -100,15 +100,6 @@ async def turn_off_light(ip: str) -> bool:
         print(f"[WIZ] Error turning off {ip}: {e}")
         return False
 
-async def set_brightness(ip: str, level: int) -> bool:
-    """Set brightness level (0-100)."""
-    level = max(0, min(100, level))
-    return await turn_on_light(ip, brightness=level)
-
-async def set_color(ip: str, color: str) -> bool:
-    """Set light color by name."""
-    return await turn_on_light(ip, color=color)
-
 async def control_light(name: str, action: str, value: str = None) -> str:
     """
     Main function to control a light or group of lights.
@@ -147,9 +138,10 @@ async def control_light(name: str, action: str, value: str = None) -> str:
         elif action == "encender":
             success = await turn_on_light(ip)
         elif action == "brillo" and value:
-            success = await set_brightness(ip, int(value))
+            level = max(0, min(100, int(value)))
+            success = await turn_on_light(ip, brightness=level)
         elif action == "color" and value:
-            success = await set_color(ip, value)
+            success = await turn_on_light(ip, color=value)
         else:
             success = False
         results.append(success)
@@ -168,8 +160,3 @@ async def control_light(name: str, action: str, value: str = None) -> str:
         return f"⚠️ {display_name}: algunas luces fallaron"
     else:
         return f"❌ Error controlando {display_name}"
-    
-    return f"⚠️ Acción no reconocida: {action}"
-
-
-
