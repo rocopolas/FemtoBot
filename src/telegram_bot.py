@@ -206,10 +206,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         asyncio.create_task(queue_worker())
 
 
-async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYPE, 
+async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYPE,
                                use_reply: bool = False, text_override: str = None):
     """Process a single message with LLM."""
-    global last_activity
     chat_id = update.effective_chat.id
     message_id = update.message.message_id
     user_text = text_override or update.message.text
