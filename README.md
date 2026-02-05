@@ -16,6 +16,8 @@ A smart personal assistant that runs locally using [Ollama](https://ollama.ai). 
 - 🧠 **Persistent memory** - The bot remembers information about you
 - 💡 **Smart lights** - Control WIZ lights via chat
 - 🖼️ **Image search** - Search for images on the web
+- 🛡️ **Rate limiting** - Protection against spam
+- 🧪 **Test suite** - Comprehensive testing infrastructure
 
 ## 🤔 Why LocalBot?
 
@@ -34,48 +36,72 @@ A smart personal assistant that runs locally using [Ollama](https://ollama.ai). 
 - Not paying monthly subscriptions
 - Having a personal assistant that runs on YOUR hardware
 
-## 📁 Structure
+## 📁 Project Structure
 
 ```
 LocalBot/
-├── config.yaml          # Main configuration
-├── .env                 # Environment variables (tokens)
-├── requirements.txt     # Python dependencies
-├── cargarentorno.sh     # Installation script
-├── run.sh               # Run script
+├── config.yaml              # Main configuration
+├── .env                     # Environment variables (tokens)
+├── requirements.txt         # Python dependencies
+├── run.sh                   # Run script (setup + run)
 │
-├── src/                 # Source code
-│   ├── telegram_bot.py  # Telegram bot
-│   ├── tui.py           # TUI interface
-│   └── client.py        # Ollama client
+├── src/                     # Source code
+│   ├── telegram_bot.py      # Main Telegram bot
+│   ├── tui.py              # TUI interface
+│   ├── client.py           # Ollama client
+│   ├── constants.py        # Global constants
+│   ├── handlers/           # Message handlers
+│   │   ├── commands.py     # Bot commands
+│   │   ├── voice.py        # Voice messages
+│   │   ├── audio.py        # Audio files
+│   │   ├── photo.py        # Images
+│   │   └── document.py     # Documents
+│   ├── jobs/               # Background jobs
+│   │   ├── events.py       # Event notifications
+│   │   ├── inactivity.py   # Auto-unload models
+│   │   └── cleanup.py      # Cleanup old data
+│   ├── middleware/         # Middleware
+│   │   └── rate_limiter.py # Rate limiting
+│   └── state/              # State management
+│       └── chat_manager.py # Chat history
 │
-├── utils/               # Utility modules
-│   ├── audio_utils.py   # Whisper transcription
-│   ├── youtube_utils.py # YouTube audio download
-│   ├── search_utils.py  # Brave search
-│   ├── cron_utils.py    # Crontab management
-│   ├── document_utils.py # PDF/DOCX extraction
-│   ├── email_utils.py   # Gmail integration
-│   ├── wiz_utils.py     # WIZ smart lights
-│   └── config_loader.py # YAML config loader
+├── utils/                   # Utility modules
+│   ├── audio_utils.py       # Whisper transcription
+│   ├── youtube_utils.py     # YouTube audio download
+│   ├── twitter_utils.py     # Twitter/X downloads
+│   ├── search_utils.py      # Brave search
+│   ├── cron_utils.py        # Crontab management
+│   ├── document_utils.py    # PDF/DOCX extraction
+│   ├── email_utils.py       # Gmail integration
+│   ├── wiz_utils.py         # WIZ smart lights
+│   ├── telegram_utils.py    # Telegram helpers
+│   └── config_loader.py     # YAML config loader
 │
-├── data/                # Data files
-│   ├── instructions.md  # LLM instructions
-│   ├── memory.md        # User memory
-│   └── events.txt       # Notification queue
+├── tests/                   # Test suite
+│   ├── conftest.py
+│   └── unit/
 │
-└── assets/              # Resources
-    └── styles.tcss      # TUI styles
+├── docs/                    # Documentation
+│   ├── architecture.md
+│   └── troubleshooting.md
+│
+├── data/                    # Data files
+│   ├── instructions.md      # LLM instructions
+│   ├── memory.md            # User memory
+│   └── events.txt           # Notification queue
+│
+└── assets/                  # Resources
+    └── styles.tcss          # TUI styles
 ```
 
-## 🚀 Installation
+## 🚀 Quick Start
 
 ### Requirements
 - Python 3.12+
 - [Ollama](https://ollama.ai) installed and running
 - FFmpeg (for audio transcription)
 
-### Steps
+### Installation & Run
 
 1. **Clone the repository:**
 ```bash
@@ -83,11 +109,17 @@ git clone https://github.com/your-username/LocalBot.git
 cd LocalBot
 ```
 
-2. **Set up environment:**
+2. **Run the bot (auto-setup):**
 ```bash
-chmod +x cargarentorno.sh
-./cargarentorno.sh
+chmod +x run.sh
+./run.sh
 ```
+
+The script will:
+- Create virtual environment (if needed)
+- Install Python 3.12 (if not present)
+- Install all dependencies
+- Start the bot
 
 3. **Configure environment variables:**
 ```bash
@@ -129,15 +161,24 @@ INACTIVITY_TIMEOUT_MINUTES: 5
 ### Telegram Bot
 ```bash
 ./run.sh
-# or
-source venv_bot/bin/activate
-python src/telegram_bot.py
 ```
 
 ### TUI Interface
 ```bash
 source venv_bot/bin/activate
 python src/main.py
+```
+
+### Running Tests
+```bash
+# Install test dependencies
+pip install pytest pytest-asyncio pytest-cov
+
+# Run all tests
+pytest tests/ -v
+
+# With coverage
+pytest tests/ --cov=src --cov=utils
 ```
 
 ## 📱 Telegram Commands
@@ -199,8 +240,6 @@ Control WIZ lights via natural language:
 - "Turn off the bedroom lights"
 - "Set brightness to 50%"
 - "Change color to red"
-
-- "Change color to red"
 - "Turn off all lights"
 
 **Configuration** in `config.yaml`:
@@ -217,25 +256,46 @@ WIZ_LIGHTS:
 
 ## 🔧 Development
 
+### Architecture
+The project uses a modular architecture:
+- **Handlers**: Separate modules for different message types
+- **Jobs**: Background tasks (cleanup, notifications)
+- **State**: Thread-safe chat history management
+- **Middleware**: Rate limiting and other cross-cutting concerns
+
+See `docs/architecture.md` for detailed information.
+
 ### Adding new features
 1. Create the module in `utils/`
-2. Import it in `src/telegram_bot.py`
+2. Import it in appropriate handler
 3. Add instructions in `data/instructions.md`
 
 ### Changing model
 Edit `config.yaml`:
+```yaml
 MODEL: "your-model:tag"
+```
+
+## 🐛 Troubleshooting
+
+See `docs/troubleshooting.md` for common issues and solutions.
+
+Common problems:
+- **Ollama connection refused** → Check if `ollama serve` is running
+- **Whisper not installed** → Run `pip install faster-whisper`
+- **Rate limit exceeded** → Wait 60 seconds between messages
+- **Model not found** → Download with `ollama pull model-name`
 
 ## 📄 License
 
 MIT License 
 Copyright 2026 Rocopolas
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ---
 
