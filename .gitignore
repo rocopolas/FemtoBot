@@ -3,4 +3,4 @@
 /__pycache__
 /venv_bot
 **/__pycache__/
-
+/.pytest_cache

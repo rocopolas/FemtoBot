@@ -5,19 +5,17 @@ A smart personal assistant that runs locally using [Ollama](https://ollama.ai). 
 ## ✨ Features
 
 - 💬 **Local LLM chat** - No external API dependencies
+- 🧠 **Persistent memory** - The bot remembers information about you
 - 📷 **Image analysis** - Describe and understand images with vision model
 - 🎙️ **Audio transcription** - Convert voice messages to text with Whisper
 - 🎥 **YouTube summaries** - Send a link and get a summary
 - 🐦 **Twitter/X downloader** - Download videos/images directly
 - 🔍 **Web search** - Brave Search integration
+- 🖼️ **Image search** - Search for images on the web
 - 📄 **Document reading** - Analyze and chat with PDF or text files
 - 📧 **Email digest** - Read and summarize emails from Gmail
 - ⏰ **Reminders** - Schedule cron tasks that notify you in chat
-- 🧠 **Persistent memory** - The bot remembers information about you
 - 💡 **Smart lights** - Control WIZ lights via chat
-- 🖼️ **Image search** - Search for images on the web
-- 🛡️ **Rate limiting** - Protection against spam
-- 🧪 **Test suite** - Comprehensive testing infrastructure
 
 ## 🤔 Why LocalBot?
 
