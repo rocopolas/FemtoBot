@@ -4,3 +4,4 @@
 /venv_bot
 **/__pycache__/
 /.pytest_cache
+/data/chroma_db

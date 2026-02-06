@@ -5,7 +5,8 @@ A smart personal assistant that runs locally using [Ollama](https://ollama.ai). 
 ## ✨ Features
 
 - 💬 **Local LLM chat** - No external API dependencies
-- 🧠 **Persistent memory** - The bot remembers information about you
+- 🧠 **Vector Memory (RAG)** - Remembers facts and conversations using embeddings
+- 📚 **Document Store** - Indexed PDF/TXT search for context awareness
 - 📷 **Image analysis** - Describe and understand images with vision model
 - 🎙️ **Audio transcription** - Convert voice messages to text with Whisper
 - 🎥 **YouTube summaries** - Send a link and get a summary
@@ -98,6 +99,8 @@ LocalBot/
 - Python 3.12+
 - [Ollama](https://ollama.ai) installed and running
 - FFmpeg (for audio transcription)
+- **ChromaDB** (installed automatically)
+
 
 ### Installation & Run
 
@@ -145,10 +148,14 @@ cp .env.example .env
 # Edit .env with your tokens
 ```
 
-4. **Download Ollama model:**
+4. **Download Models:**
 ```bash
+# Chat Model
 ollama pull llama3.1:latest
-# Or your preferred model
+
+# Embedding Model (Required for RAG)
+ollama pull nomic-embed-text
+# or qwen3-embedding:0.6b (configure in config.yaml)
 ```
 
 ## ⚙️ Configuration
@@ -172,6 +179,13 @@ WHISPER_LANGUAGE: "es"
 WHISPER_MODEL_VOICE: "base"
 WHISPER_MODEL_EXTERNAL: "medium"
 INACTIVITY_TIMEOUT_MINUTES: 5
+
+# RAG / Memory Configuration
+RAG:
+  EMBEDDING_MODEL: "nomic-embed-text" # Must match ollama pull
+  CHUNK_SIZE: 1000
+  SIMILARITY_THRESHOLD: 0.4 # Lower = looser matching
+  MAX_RESULTS: 3
 ```
 
 ## 🎮 Usage
@@ -260,10 +274,20 @@ Ask the bot things like:
 - "Remind me to drink water every hour"
 - "Notify me tomorrow at 9am about my meeting"
 
-### Memory
-The bot can remember information about you:
-- Edit `data/memory.md` with your data
-- Or just tell it things and it will remember automatically
+### 🧠 Vector Memory (RAG)
+The bot uses a local vector database (ChromaDB) to remember facts and conversations.
+
+**To learn new things:**
+- Just tell it: *"My mom is Jessica"* → Auto-saved if deemed important.
+- Force save: `:::memory Data to save:::`
+
+**To forget:**
+- `:::memory_delete Data to forget:::`
+- Detects the most similar memory (>85% match) and deletes it.
+
+**To view usage:**
+- Look for **"🧠 RAG..."** status when the bot is searching its memory.
+
 
 ### Email Digest (Optional)
 If Gmail is configured, the bot will:

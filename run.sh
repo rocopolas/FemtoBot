@@ -90,7 +90,7 @@ echo -e "${CYAN}Activating virtual environment...${NC}"
 source "$VENV_ACTIVATE"
 
 # Check dependencies
-if ! python -c "import telegram" 2>/dev/null; then
+if ! python -c "import telegram; import chromadb" 2>/dev/null; then
     echo -e "${YELLOW}Installing dependencies...${NC}"
     
     pip install --upgrade pip --quiet

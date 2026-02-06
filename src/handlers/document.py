@@ -23,15 +23,15 @@ class DocumentHandler:
     def __init__(
         self,
         chat_manager: ChatManager,
+        vector_manager,
         is_authorized_func,
         get_system_prompt_func,
-        load_memory_func,
         command_patterns
     ):
         self.chat_manager = chat_manager
+        self.vector_manager = vector_manager
         self.is_authorized = is_authorized_func
         self.get_system_prompt = get_system_prompt_func
-        self.load_memory = load_memory_func
         self.command_patterns = command_patterns
         self.model = get_config("MODEL")
     
@@ -88,7 +88,16 @@ class DocumentHandler:
             if len(doc_text) > 50000:
                 doc_text = doc_text[:50000] + "\n\n[... documento truncado por longitud ...]"
             
-            await status_msg.edit_text(f"💭 Procesando documento {doc_type}...")
+            # Index to Vector Store
+            from datetime import datetime
+            metadata = {
+                "source": file_name,
+                "type": doc_type,
+                "timestamp": str(datetime.now())
+            }
+            await self.vector_manager.add_document(doc_text, metadata)
+            
+            await status_msg.edit_text(f"🧠 Procesando e indexando documento {doc_type}...")
             
             # Initialize chat history if needed
             history = await self.chat_manager.get_history(chat_id)
@@ -142,7 +151,11 @@ class DocumentHandler:
                         memory_path = os.path.join(PROJECT_ROOT, get_config("MEMORY_FILE"))
                         with open(memory_path, "a", encoding="utf-8") as f:
                             f.write(f"\n- {memory_content}")
-                        self.load_memory()
+                        # Legacy load memory memory
+                        # self.load_memory() 
+                        
+                        # Save to Vector DB
+                        await self.vector_manager.add_memory(memory_content)
                         await context.bot.send_message(chat_id, f"💾 Guardado en memoria: _{memory_content}_", parse_mode="Markdown")
                     except Exception as e:
                         await context.bot.send_message(chat_id, f"⚠️ Error guardando memoria: {str(e)}")

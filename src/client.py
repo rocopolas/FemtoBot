@@ -196,3 +196,35 @@ class OllamaClient:
         except Exception as e:
             logger.error(f"Unexpected error in describe_image: {e}", exc_info=True)
             return f"[Error: {str(e)}]"
+
+    async def generate_embedding(self, model: str, text: str) -> List[float]:
+        """
+        Generate embeddings for text using a specific model.
+        
+        Args:
+            model: Name of the embedding model
+            text: Text to embed
+            
+        Returns:
+            List of floats representing the embedding
+        """
+        url = f"{self.base_url}/api/embeddings"
+        payload = {
+            "model": model,
+            "prompt": text
+        }
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, json=payload, timeout=30.0)
+                if response.status_code == 200:
+                    data = response.json()
+                    embedding = data.get("embedding", [])
+                    return embedding
+                else:
+                    logger.error(f"Embedding error {response.status_code}: {response.text}")
+                    return []
+                    
+        except Exception as e:
+            logger.error(f"Error generating embedding: {e}")
+            return []

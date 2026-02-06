@@ -20,6 +20,7 @@ sys.path.insert(0, PROJECT_ROOT)
 from src.constants import PROJECT_ROOT as CONSTANTS_ROOT
 from src.state.chat_manager import ChatManager
 from src.client import OllamaClient
+from src.memory.vector_store import VectorManager
 from src.handlers.commands import CommandHandlers
 from src.handlers.voice import VoiceHandler
 from src.handlers.audio import AudioHandler
@@ -31,7 +32,7 @@ from src.jobs.cleanup import CleanupJob
 from src.middleware.rate_limiter import rate_limit
 
 from utils.cron_utils import CronUtils
-from utils.config_loader import get_config
+from utils.config_loader import get_config, get_all_config
 from utils.telegram_utils import split_message, format_bot_response, escape_markdown, prune_history
 from utils.youtube_utils import is_youtube_url, download_youtube_audio, get_video_title
 from utils.twitter_utils import is_twitter_url, download_twitter_video, get_twitter_media_url
@@ -57,6 +58,7 @@ logger = logging.getLogger(__name__)
 
 # Global instances
 chat_manager = ChatManager(max_inactive_hours=24)
+vector_manager = VectorManager(get_all_config(), OllamaClient())
 message_queue = asyncio.Queue()
 queue_worker_running = False
 last_activity = datetime.now()
@@ -75,9 +77,8 @@ COMMAND_PATTERNS = {
     'camara': re.compile(r':::camara(?:\s+\S+)?:::'),
 }
 
-# Memory and instructions
+# System instructions
 system_instructions = ""
-user_memory = ""
 
 
 def is_authorized(user_id: int) -> bool:
@@ -104,31 +105,13 @@ def load_instructions():
         logger.error(f"Error loading instructions: {e}")
 
 
-def load_memory():
-    """Load user memory from file."""
-    global user_memory
-    try:
-        from src.constants import PROJECT_ROOT
-        memory_path = os.path.join(PROJECT_ROOT, get_config("MEMORY_FILE"))
-        with open(memory_path, "r", encoding="utf-8") as f:
-            content = f.read().strip()
-            if content:
-                user_memory = content
-                logger.info("Memory loaded successfully")
-    except FileNotFoundError:
-        logger.warning("Memory file not found")
-    except Exception as e:
-        logger.error(f"Error loading memory: {e}")
+
+# [DELETED] load_memory function
 
 
 def get_system_prompt():
-    """Combine instructions and memory into system prompt."""
-    parts = []
-    if system_instructions:
-        parts.append(system_instructions)
-    if user_memory:
-        parts.append(f"\n\n---\n\n# Memoria del Usuario\n\n{user_memory}")
-    return "\n".join(parts) if parts else ""
+    """Get system instructions."""
+    return system_instructions if system_instructions else ""
 
 
 # Initialize handlers
@@ -150,15 +133,14 @@ photo_handler = PhotoHandler(
     chat_manager=chat_manager,
     is_authorized_func=is_authorized,
     get_system_prompt_func=get_system_prompt,
-    load_memory_func=load_memory,
     command_patterns=COMMAND_PATTERNS
 )
 
 document_handler = DocumentHandler(
     chat_manager=chat_manager,
+    vector_manager=vector_manager,
     is_authorized_func=is_authorized,
     get_system_prompt_func=get_system_prompt,
-    load_memory_func=load_memory,
     command_patterns=COMMAND_PATTERNS
 )
 
@@ -295,26 +277,57 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
             await context.bot.send_message(chat_id, f"❌ Error: {str(e)}")
             return
     
-    # Prepare context
-    current_time = datetime.now().strftime("%H:%M del %d/%m/%Y")
-    crontab_lines = CronUtils.get_crontab()
-    crontab_str = "\n".join(crontab_lines) if crontab_lines else "(vacío)"
-    
-    context_message = f"{user_text} [Sistema: La hora actual es {current_time}. Agenda: {crontab_str}]"
-    await chat_manager.append_message(chat_id, {"role": "user", "content": context_message})
-    
-    # Generate response
+    # Generate response (Send "..." immediately)
     await context.bot.send_chat_action(chat_id=chat_id, action="typing")
     
     if placeholder_msg is None:
         if use_reply:
             placeholder_msg = await context.bot.send_message(
-                chat_id=chat_id, text="...", reply_to_message_id=message_id
+                chat_id=chat_id, text="🧠 RAG...", reply_to_message_id=message_id
             )
         else:
-            placeholder_msg = await update.message.reply_text("...")
+            placeholder_msg = await update.message.reply_text("🧠 RAG...")
+
+    # Prepare context
+    current_time = datetime.now().strftime("%H:%M del %d/%m/%Y")
+    crontab_lines = CronUtils.get_crontab()
+    crontab_str = "\n".join(crontab_lines) if crontab_lines else "(vacío)"
+    
+    # RAG Context Retrieval
+    rag_context = ""
+    try:
+        # Search both collections
+        docs_results = await vector_manager.search(user_text, collection_type="documents", limit=3)
+        mem_results = await vector_manager.search(user_text, collection_type="memory", limit=3)
+        
+        # Combine and sort by similarity
+        all_results = docs_results + mem_results
+        all_results.sort(key=lambda x: x['similarity'], reverse=True)
+        
+        # Take top 3
+        search_results = all_results[:3]
+        
+        if search_results:
+             logger.info(f"🔍 RAG Results found: {len(search_results)}")
+             rag_entries = [
+                f"- {res['content']} (Sim: {res['similarity']:.2f})"
+                for res in search_results
+            ]
+             rag_context = "\n\n# Contexto Recuperado (RAG)\n" + "\n".join(rag_entries)
+             logger.info(f"📄 RAG Context injected: {rag_context}")
+        else:
+             logger.info("❌ No RAG results found.")
+    except Exception as e:
+        logger.error(f"RAG Error: {e}")
+
+    context_message = f"{user_text} [Sistema: La hora actual es {current_time}. Agenda: {crontab_str}.{rag_context}]"
+    await chat_manager.append_message(chat_id, {"role": "user", "content": context_message})
     
     try:
+        # Update UI to show LLM generation started
+        if placeholder_msg:
+             await placeholder_msg.edit_text("🧠 LLM...")
+             
         client = OllamaClient()
         history = await chat_manager.get_history(chat_id)
         pruned_history = prune_history(history, get_config("CONTEXT_LIMIT", 30000))
@@ -431,45 +444,33 @@ async def _process_commands(full_response: str, chat_id: int, context: ContextTy
         target = match.group(1).strip()
         if target:
             try:
-                memory_path = os.path.join(PROJECT_ROOT, get_config("MEMORY_FILE"))
-                with open(memory_path, "r", encoding="utf-8") as f:
-                    lines = f.readlines()
-                
-                new_lines = [l for l in lines if target.lower() not in l.lower()]
-                removed = len(lines) - len(new_lines)
-                
-                if removed > 0:
-                    with open(memory_path, "w", encoding="utf-8") as f:
-                        f.writelines(new_lines)
-                    load_memory()
+                if await vector_manager.delete_memory(target):
                     await context.bot.send_message(
-                        chat_id,
-                        f"🗑️ Eliminado: _{target}_",
-                        parse_mode="Markdown"
+                        chat_id, 
+                        f"🗑️ Memoria borrada: _{target}_",
+                         parse_mode="Markdown"
                     )
                 else:
-                    await context.bot.send_message(
-                        chat_id,
-                        f"⚠️ No encontrado: _{target}_",
-                        parse_mode="Markdown"
-                    )
+                     await context.bot.send_message(chat_id, f"⚠️ No encontré recuerdos similares a: _{target}_", parse_mode="Markdown")
             except Exception as e:
-                await context.bot.send_message(chat_id, f"⚠️ Error: {str(e)}")
+                await context.bot.send_message(chat_id, f"⚠️ Error borrando memoria: {str(e)}")
     
+    # Memory add
     # Memory add
     for match in COMMAND_PATTERNS['memory'].finditer(full_response):
         content = match.group(1).strip()
         if content:
             try:
-                memory_path = os.path.join(PROJECT_ROOT, get_config("MEMORY_FILE"))
-                with open(memory_path, "a", encoding="utf-8") as f:
-                    f.write(f"\n- {content}")
-                load_memory()
-                await context.bot.send_message(
-                    chat_id,
-                    f"💾 Guardado: _{content}_",
-                    parse_mode="Markdown"
-                )
+                # Save ONLY to Vector DB
+                if await vector_manager.add_memory(content):
+                    await context.bot.send_message(
+                        chat_id,
+                        f"💾 Guardado (DB): _{content}_",
+                        parse_mode="Markdown"
+                    )
+                else:
+                     await context.bot.send_message(chat_id, "❌ Error al guardar en DB.")
+
             except Exception as e:
                 await context.bot.send_message(chat_id, f"⚠️ Error: {str(e)}")
     
@@ -486,8 +487,9 @@ async def _process_commands(full_response: str, chat_id: int, context: ContextTy
 def main():
     """Main entry point."""
     # Load initial data
+    # Load initial data
     load_instructions()
-    load_memory()
+    # memory load removed
     
     # Build application
     application = ApplicationBuilder().token(TOKEN).build()

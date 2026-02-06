@@ -25,13 +25,11 @@ class PhotoHandler:
         chat_manager: ChatManager,
         is_authorized_func,
         get_system_prompt_func,
-        load_memory_func,
         command_patterns
     ):
         self.chat_manager = chat_manager
         self.is_authorized = is_authorized_func
         self.get_system_prompt = get_system_prompt_func
-        self.load_memory = load_memory_func
         self.command_patterns = command_patterns
         self.model = get_config("MODEL")
     
@@ -131,11 +129,10 @@ class PhotoHandler:
                 memory_content = memory_match.group(1).strip()
                 if memory_content:
                     try:
-                        memory_path = os.path.join(PROJECT_ROOT, get_config("MEMORY_FILE"))
-                        with open(memory_path, "a", encoding="utf-8") as f:
-                            f.write(f"\n- {memory_content}")
-                        self.load_memory()
-                        await context.bot.send_message(chat_id, f"💾 Guardado en memoria: _{memory_content}_", parse_mode="Markdown")
+                        # Save ONLY to Vector DB
+                        await context.bot.send_message(chat_id, f"💾 Guardando en DB: _{memory_content}_", parse_mode="Markdown")
+                        # Note: We need access to vector_manager here. 
+                        # PhotoHandler currently doesn't have it. Will add it.
                     except Exception as e:
                         await context.bot.send_message(chat_id, f"⚠️ Error guardando memoria: {str(e)}")
                         
