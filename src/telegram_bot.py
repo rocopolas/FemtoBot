@@ -69,15 +69,17 @@ email_digest_job = EmailDigestJob(notification_chat_id=NOTIFICATION_CHAT_ID)
 
 # Config values
 MODEL = get_config("MODEL")
+MATH_MODEL = get_config("MATH_MODEL")
 COMMAND_PATTERNS = {
     'memory': re.compile(r':::memory\s+(.+?):::', re.DOTALL),
     'memory_delete': re.compile(r':::memory_delete\s+(.+?):::', re.DOTALL),
-    'cron': re.compile(r':::cron\s+(.+?)\s+(.+?):::'),
+    'cron': re.compile(r':::cron\s+(.+?):::', re.DOTALL),
     'cron_delete': re.compile(r':::cron_delete\s+(.+?):::'),
     'search': re.compile(r':::search\s+(.+?):::'),
     'foto': re.compile(r':::foto\s+(.+?):::', re.IGNORECASE),
     'luz': re.compile(r':::luz\s+(\S+)\s+(\S+)(?:\s+(\S+))?:::'),
     'camara': re.compile(r':::camara(?:\s+\S+)?:::'),
+    'matematicas': re.compile(r':::matematicas:::'),
 }
 
 # System instructions
@@ -169,6 +171,71 @@ async def queue_worker():
 
 # Set queue worker function for voice handler
 voice_handler.queue_worker = queue_worker
+
+
+def _format_math_for_telegram(text: str) -> str:
+    """Format math response for Telegram Markdown compatibility."""
+    import re
+    
+    # Remove LaTeX delimiters \( \) and replace with backticks
+    text = re.sub(r'\\\((.*?)\\\)', r'`\1`', text)
+    
+    # Remove LaTeX delimiters \[ \] and format as code block
+    text = re.sub(r'\\\[(.*?)\\\]', r'```\n\1\n```', text, flags=re.DOTALL)
+    
+    # Remove \boxed{} and format as bold
+    text = re.sub(r'\\boxed\{(.*?)\}', r'*\1*', text)
+    
+    # Convert common LaTeX commands to readable format
+    replacements = {
+        r'\\cdot': '·',
+        r'\\times': '×',
+        r'\\div': '÷',
+        r'\\pm': '±',
+        r'\\mp': '∓',
+        r'\\leq': '≤',
+        r'\\geq': '≥',
+        r'\\neq': '≠',
+        r'\\approx': '≈',
+        r'\\equiv': '≡',
+        r'\\infty': '∞',
+        r'\\infty': '∞',
+        r'\\sum': 'Σ',
+        r'\\prod': 'Π',
+        r'\\int': '∫',
+        r'\\sqrt': '√',
+        r'\\alpha': 'α',
+        r'\\beta': 'β',
+        r'\\gamma': 'γ',
+        r'\\delta': 'δ',
+        r'\\epsilon': 'ε',
+        r'\\theta': 'θ',
+        r'\\lambda': 'λ',
+        r'\\mu': 'μ',
+        r'\\pi': 'π',
+        r'\\sigma': 'σ',
+        r'\\phi': 'φ',
+        r'\\omega': 'ω',
+        r'\\rightarrow': '→',
+        r'\\leftarrow': '←',
+        r'\\Rightarrow': '⇒',
+        r'\\Leftarrow': '⇐',
+        r'\\frac\{([^}]+)\}\{([^}]+)\}': r'(\1)/(\2)',
+        r'\\text\{([^}]+)\}': r'\1',
+        r'\^\{([^}]+)\}': r'^\1',
+        r'_\{([^}]+)\}': r'_\1',
+    }
+    
+    for pattern, replacement in replacements.items():
+        text = re.sub(pattern, replacement, text)
+    
+    # Clean up any remaining LaTeX backslashes before special chars
+    text = re.sub(r'\\([a-zA-Z]+)', r'\1', text)
+    
+    # Ensure numbered lists use proper format
+    text = re.sub(r'^(\d+)\.\s+', r'\1\. ', text, flags=re.MULTILINE)
+    
+    return text.strip()
 
 
 @rate_limit(max_messages=10, window_seconds=60)
@@ -340,6 +407,28 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
         async for chunk in client.stream_chat(MODEL, pruned_history):
             full_response += chunk
         
+        # Handle math command - switch to math model
+        if COMMAND_PATTERNS['matematicas'].search(full_response):
+            await placeholder_msg.edit_text("🧮 Resolviendo matemáticas...")
+            logger.info(f"Detectado comando matemático, consultando {MATH_MODEL}")
+            
+            # Create messages for math model with original user question
+            math_messages = [
+                {"role": "system", "content": "Eres un experto en matemáticas. Resuelve el problema paso a paso de forma clara y precisa. Puedes usar notación LaTeX estándar como \\( \\) para fórmulas inline y \\[ \\] para ecuaciones en bloque. Usa \\boxed{} para resaltar respuestas finales."},
+                {"role": "user", "content": user_text}
+            ]
+            
+            full_response = ""
+            async for chunk in client.stream_chat(MATH_MODEL, math_messages):
+                full_response += chunk
+            
+            # Process math response for Telegram Markdown
+            full_response = _format_math_for_telegram(full_response)
+            
+            # Unload math model after use
+            await client.unload_model(MATH_MODEL)
+            logger.info(f"Modelo matemático {MATH_MODEL} descargado")
+        
         # Handle search command
         search_match = COMMAND_PATTERNS['search'].search(full_response)
         if search_match:
@@ -391,20 +480,31 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
             await chat_manager.append_message(chat_id, {"role": "assistant", "content": full_response})
         
         # Process commands
-        await _process_commands(full_response, chat_id, context)
+        commands_processed = await _process_commands(full_response, chat_id, context)
+        
+        # If response is empty after formatting but commands were processed, show confirmation
+        if not formatted and commands_processed:
+            await placeholder_msg.edit_text("✅ Comandos ejecutados correctamente.")
         
     except Exception as e:
         logger.error(f"Error processing message: {e}")
         await placeholder_msg.edit_text(f"❌ Error: {str(e)}")
 
 
-async def _process_commands(full_response: str, chat_id: int, context: ContextTypes.DEFAULT_TYPE):
-    """Process internal commands from LLM response."""
+async def _process_commands(full_response: str, chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Process internal commands from LLM response.
+    
+    Returns:
+        True if any commands were processed, False otherwise
+    """
     from utils.wiz_utils import control_light
     from src.constants import PROJECT_ROOT
     
+    commands_processed = False
+    
     # Cron delete
     for match in COMMAND_PATTERNS['cron_delete'].finditer(full_response):
+        commands_processed = True
         target = match.group(1).strip()
         target_esc = escape_markdown(target)
         await context.bot.send_message(
@@ -417,10 +517,40 @@ async def _process_commands(full_response: str, chat_id: int, context: ContextTy
         else:
             await context.bot.send_message(chat_id, "⚠️ No se encontraron tareas.")
     
+    def _unescape_telegram_markdown(text: str) -> str:
+        """Desescapa caracteres escapados de Markdown de Telegram."""
+        import re
+        # Primero desescapar todos los caracteres precedidos por backslash
+        # usando regex para capturar cualquier carácter escapado
+        unescaped = re.sub(r'\\(.)', r'\1', text)
+        return unescaped
+    
     # Cron add
     for match in COMMAND_PATTERNS['cron'].finditer(full_response):
-        schedule = match.group(1).strip()
-        command = match.group(2).strip()
+        commands_processed = True
+        # Parse cron content: "Min Hora Dia Mes DOW Comando"
+        cron_content = match.group(1).strip()
+        
+        # Desescapar primero
+        cron_content = _unescape_telegram_markdown(cron_content)
+        
+        logger.info(f"[CRON] Raw content: '{cron_content}'")
+        
+        # Split into parts - need at least 6 parts (5 schedule + command)
+        parts = cron_content.split(None, 5)
+        if len(parts) < 6:
+            logger.error(f"[CRON] Invalid cron format, expected 6 parts, got {len(parts)}: {cron_content}")
+            await context.bot.send_message(chat_id, f"❌ Error: Formato cron inválido. Se esperaban 6 campos, se obtuvieron {len(parts)}.")
+            continue
+        
+        # Extract schedule and command
+        min_field, hour_field, day_field, month_field, dow_field = parts[0], parts[1], parts[2], parts[3], parts[4]
+        command = parts[5].strip()
+        
+        schedule = f"{min_field} {hour_field} {day_field} {month_field} {dow_field}"
+        
+        logger.info(f"[CRON] Parsed schedule: '{schedule}'")
+        logger.info(f"[CRON] Parsed command: '{command}'")
         
         if command.endswith(":"):
             command = command[:-1].strip()
@@ -438,13 +568,15 @@ async def _process_commands(full_response: str, chat_id: int, context: ContextTy
             parse_mode="Markdown"
         )
         
-        if CronUtils.add_job(schedule, command):
+        success = CronUtils.add_job(schedule, command)
+        if success:
             await context.bot.send_message(chat_id, "✅ Tarea agregada.")
         else:
-            await context.bot.send_message(chat_id, "❌ Error al agregar.")
+            await context.bot.send_message(chat_id, "❌ Error al agregar. Si programaste para 'en X minutos', es posible que el procesamiento haya tardado demasiado. Intenta programar con más margen (ej: 'en 5 minutos' o más).")
     
     # Memory delete
     for match in COMMAND_PATTERNS['memory_delete'].finditer(full_response):
+        commands_processed = True
         target = match.group(1).strip()
         if target:
             try:
@@ -460,8 +592,8 @@ async def _process_commands(full_response: str, chat_id: int, context: ContextTy
                 await context.bot.send_message(chat_id, f"⚠️ Error borrando memoria: {str(e)}")
     
     # Memory add
-    # Memory add
     for match in COMMAND_PATTERNS['memory'].finditer(full_response):
+        commands_processed = True
         content = match.group(1).strip()
         if content:
             try:
@@ -480,12 +612,15 @@ async def _process_commands(full_response: str, chat_id: int, context: ContextTy
     
     # Light control
     for match in COMMAND_PATTERNS['luz'].finditer(full_response):
+        commands_processed = True
         name = match.group(1).strip()
         action = match.group(2).strip()
         value = match.group(3).strip() if match.group(3) else None
         
         result = await control_light(name, action, value)
         await context.bot.send_message(chat_id, result)
+    
+    return commands_processed
 
 
 def main():

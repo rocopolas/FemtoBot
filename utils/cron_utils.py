@@ -24,7 +24,7 @@ class CronUtils:
         r'\|\s*bash(?:\s|$)',  # pipe to bash
         r'\|\s*sh(?:\s|$)',  # pipe to sh
         r'`[^`]+`',  # command substitution with backticks
-        r'\$\([^)]+\)',  # command substitution with $()
+        r'\$\((?!date\s+\+)[^)]+\)',  # command substitution with $(), except $(date +...)
         r'>\s*/etc/',  # writing to /etc
         r'>\s*/bin/',  # writing to /bin
         r'>\s*/usr/bin/',  # writing to /usr/bin
@@ -58,6 +58,43 @@ class CronUtils:
                 return False
         
         return True
+    
+    @staticmethod
+    def _is_schedule_in_future(schedule: str) -> tuple[bool, str]:
+        """
+        Check if a one-time cron schedule is in the future.
+        
+        Args:
+            schedule: Cron schedule string (5 fields)
+            
+        Returns:
+            Tuple of (is_future, error_message)
+        """
+        parts = schedule.split()
+        if len(parts) != 5:
+            return False, "Invalid schedule format"
+        
+        # Check if this looks like a one-time job (specific numbers, not wildcards)
+        try:
+            minute = int(parts[0])
+            hour = int(parts[1])
+            day = int(parts[2])
+            month = int(parts[3])
+            
+            # Only validate one-time jobs (specific dates, not wildcards)
+            if parts[0] != '*' and parts[1] != '*' and parts[2] != '*' and parts[3] != '*':
+                from datetime import datetime
+                now = datetime.now()
+                scheduled_time = datetime(now.year, month, day, hour, minute)
+                
+                # If scheduled time is in the past, reject it
+                if scheduled_time < now:
+                    return False, f"Cannot schedule job in the past: {scheduled_time.strftime('%H:%M %d/%m/%Y')}"
+        except (ValueError, IndexError):
+            # Not a one-time job or parsing error, skip validation
+            pass
+        
+        return True, ""
     
     @staticmethod
     def _sanitize_command(command: str) -> tuple[bool, str]:
@@ -134,6 +171,12 @@ class CronUtils:
         # Validate schedule
         if not CronUtils._validate_schedule(schedule):
             logger.error(f"Invalid cron schedule: {schedule}")
+            return False
+        
+        # Check if schedule is in the future (for one-time jobs)
+        is_future, error_msg = CronUtils._is_schedule_in_future(schedule)
+        if not is_future:
+            logger.error(f"Schedule validation failed: {error_msg}")
             return False
         
         # Validate and sanitize command
