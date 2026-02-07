@@ -123,7 +123,9 @@ class TUICommandProcessor:
                 command = command[:-1].strip()
             
             # Auto-append redirection for echo commands
-            if "echo" in command and ">>" not in command:
+            if "echo" in command:
+                if ">>" in command:
+                     command = command.split(">>")[0].strip()
                 command += f" >> {events_file}"
             
             self.output(f"⚠️ Agregando tarea: {schedule} {command}", "info")

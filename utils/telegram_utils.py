@@ -61,6 +61,11 @@ def escape_markdown(text: str) -> str:
     return re.sub(f'([{re.escape(escape_chars)}])', r'\\\1', text)
 
 
+def escape_code(text: str) -> str:
+    """Escapa solo backticks y backslashes para bloques de código."""
+    return re.sub(r'([`\\])', r'\\\1', text)
+
+
 def split_message(text, limit=4096):
     """
     Splits a message into chunks that fit within the Telegram character limit.

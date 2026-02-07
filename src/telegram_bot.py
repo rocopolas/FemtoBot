@@ -506,7 +506,8 @@ async def _process_commands(full_response: str, chat_id: int, context: ContextTy
     for match in COMMAND_PATTERNS['cron_delete'].finditer(full_response):
         commands_processed = True
         target = match.group(1).strip()
-        target_esc = escape_markdown(target)
+        from utils.telegram_utils import escape_markdown, escape_code
+        target_esc = escape_code(target)
         await context.bot.send_message(
             chat_id,
             f"🗑️ Eliminando: `{target_esc}`",
@@ -555,12 +556,20 @@ async def _process_commands(full_response: str, chat_id: int, context: ContextTy
         if command.endswith(":"):
             command = command[:-1].strip()
         
-        if "echo" in command and ">>" not in command:
+        # Handle echo commands - ensure they redirect to the correct events file
+        if "echo" in command:
             events_file = os.path.join(PROJECT_ROOT, get_config("EVENTS_FILE"))
+            # Force correct events file
+            if ">>" in command:
+                # Strip entire existing redirection (including path)
+                command = command.split(">>")[0].strip()
+            # Append correct path
             command += f" >> {events_file}"
         
-        sched_esc = escape_markdown(schedule)
-        cmd_esc = escape_markdown(command)
+        from utils.telegram_utils import escape_markdown, escape_code
+        
+        sched_esc = escape_code(schedule)
+        cmd_esc = escape_code(command)
         
         await context.bot.send_message(
             chat_id,
