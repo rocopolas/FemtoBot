@@ -19,14 +19,31 @@ class TestOllamaClient:
         """Test successful streaming chat."""
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.aiter_lines = MagicMock(return_value=[
+        class AsyncIterator:
+            def __init__(self, data):
+                self.data = iter(data)
+            def __aiter__(self):
+                return self
+            async def __anext__(self):
+                try:
+                    return next(self.data)
+                except StopIteration:
+                    raise StopAsyncIteration
+
+        mock_response.aiter_lines = MagicMock(return_value=AsyncIterator([
             json.dumps({"message": {"content": "Hello"}, "done": False}),
             json.dumps({"message": {"content": " world"}, "done": True}),
-        ])
+        ]))
+        
+        # Create async context manager mock for stream
+        stream_mock = AsyncMock()
+        stream_mock.__aenter__ = AsyncMock(return_value=mock_response)
+        stream_mock.__aexit__ = AsyncMock(return_value=None)
         
         with patch("httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
-            mock_instance.stream.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+            mock_instance.stream = MagicMock()
+            mock_instance.stream.return_value = stream_mock
             mock_client.return_value.__aenter__ = AsyncMock(return_value=mock_instance)
             
             chunks = []
