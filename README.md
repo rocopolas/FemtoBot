@@ -17,6 +17,7 @@ A smart personal assistant that runs locally using [Ollama](https://ollama.ai). 
 - 📧 **Email digest** - Read and summarize emails from Gmail
 - ⏰ **Reminders** - Schedule cron tasks that notify you in chat
 - 💡 **Smart lights** - Control WIZ lights via chat
+- 🧮 **Math solver** - Solve complex equations and symbolic math problems
 
 ## 🤔 Why LocalBot?
 
@@ -264,6 +265,15 @@ pytest tests/ --cov=src --cov=utils
 - The **LLM decides** to search for an image and uses the command `:::foto...:::`.
 - The bot searches Brave Images, then uses its **Vision Model** to look at the candidates.
 - It only sends the image if the AI confirms it matches your request!
+
+### 🧮 Math Solver
+- **Automatic Detection**: Ask any math problem (algebra, calculus, matrices, etc.).
+- The bot detects the intent and automatically switches to a **Specialized Math Model** (configured in `config.yaml`).
+- **Formatted Response**: You receive a step-by-step solution with perfect **LaTeX** rendering in Telegram.
+- **Examples:**
+  - "Solve the integral of x^2 dx"
+  - "Find the roots of 2x^2 + 5x - 3 = 0"
+  - "Calculate the eigenvalues of the matrix..."
 
 ### Document Reading
 - Send a PDF, DOCX, or TXT file → Bot extracts text and responds
