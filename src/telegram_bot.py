@@ -11,6 +11,7 @@ from telegram.ext import (
     ApplicationBuilder, ContextTypes,
     CommandHandler, MessageHandler, filters
 )
+from telegram.error import BadRequest
 
 # Add parent directory to path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -165,7 +166,12 @@ async def queue_worker():
             return
         
         last_activity = datetime.now()
-        await process_message_item(update, context, use_reply=needs_reply, text_override=text_override)
+        last_activity = datetime.now()
+        try:
+            await process_message_item(update, context, use_reply=needs_reply, text_override=text_override)
+        except Exception as e:
+            logger.error(f"Error processing text message in queue: {e}", exc_info=True)
+        
         message_queue.task_done()
 
 
@@ -484,11 +490,22 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
         
         # If response is empty after formatting but commands were processed, show confirmation
         if not formatted and commands_processed:
-            await placeholder_msg.edit_text("✅ Comandos ejecutados correctamente.")
+            try:
+                await placeholder_msg.edit_text("✅ Comandos ejecutados correctamente.")
+            except BadRequest:
+                await context.bot.send_message(chat_id, "✅ Comandos ejecutados correctamente.")
         
     except Exception as e:
         logger.error(f"Error processing message: {e}")
-        await placeholder_msg.edit_text(f"❌ Error: {str(e)}")
+        logger.error(f"Error processing message: {e}")
+        try:
+            if placeholder_msg:
+                await placeholder_msg.edit_text(f"❌ Error: {str(e)}")
+            else:
+                await context.bot.send_message(chat_id, f"❌ Error: {str(e)}")
+        except Exception:
+            # If edit fails (e.g. message deleted), send new message
+            await context.bot.send_message(chat_id, f"❌ Error: {str(e)}")
 
 
 async def _process_commands(full_response: str, chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
