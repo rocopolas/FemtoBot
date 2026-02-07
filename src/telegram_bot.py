@@ -156,23 +156,24 @@ async def queue_worker():
     """Process messages from queue."""
     global queue_worker_running, last_activity
     
-    while True:
-        try:
-            item = await asyncio.wait_for(message_queue.get(), timeout=1.0)
-            update, context, needs_reply = item[0], item[1], item[2]
-            text_override = item[3] if len(item) > 3 else None
-        except asyncio.TimeoutError:
-            queue_worker_running = False
-            return
-        
-        last_activity = datetime.now()
-        last_activity = datetime.now()
-        try:
-            await process_message_item(update, context, use_reply=needs_reply, text_override=text_override)
-        except Exception as e:
-            logger.error(f"Error processing text message in queue: {e}", exc_info=True)
-        
-        message_queue.task_done()
+    try:
+        while True:
+            try:
+                item = await asyncio.wait_for(message_queue.get(), timeout=1.0)
+                update, context, needs_reply = item[0], item[1], item[2]
+                text_override = item[3] if len(item) > 3 else None
+            except asyncio.TimeoutError:
+                return
+            
+            last_activity = datetime.now()
+            try:
+                await process_message_item(update, context, use_reply=needs_reply, text_override=text_override)
+            except Exception as e:
+                logger.error(f"Error processing text message in queue: {e}", exc_info=True)
+            
+            message_queue.task_done()
+    finally:
+        queue_worker_running = False
 
 
 # Set queue worker function for voice handler
