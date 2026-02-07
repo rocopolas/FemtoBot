@@ -244,19 +244,19 @@ pytest tests/ --cov=src --cov=utils
 
 ## 🎤 Special Features
 
-### Image Analysis
+### 👁️ Image Analysis
 - Send a photo → Vision model describes it, text model responds
 - Send photo + caption → Bot considers both for response
 
-### Audio Transcription
+### 🎙️ Audio Transcription
 - Send a voice message → Transcribed and answered
 - Send an audio file → Transcription only (larger model)
 
-### YouTube Summary & Download
+### 🎥 YouTube Summary & Download
 - Send a YouTube link → Bot downloads, transcribes and summarizes (Default)
 - Send link + "download" → Bot sends you the video file
 
-### Twitter/X Media Download
+### 🐦 Twitter/X Media Download
 - Send a Twitter/X link and ask to "download" or "bajar"
 - The bot will download the video/image and send the file to you
 
@@ -275,11 +275,11 @@ pytest tests/ --cov=src --cov=utils
   - "Find the roots of 2x^2 + 5x - 3 = 0"
   - "Calculate the eigenvalues of the matrix..."
 
-### Document Reading
+### 📄 Document Reading
 - Send a PDF, DOCX, or TXT file → Bot extracts text and responds
 - Send document + caption → Bot considers both for response
 
-### Reminders
+### ⏰ Reminders
 Ask the bot things like:
 - "Remind me to drink water every hour"
 - "Notify me tomorrow at 9am about my meeting"
@@ -299,14 +299,14 @@ The bot uses a local vector database (ChromaDB) to remember facts and conversati
 - Look for **"🧠 RAG..."** status when the bot is searching its memory.
 
 
-### Email Digest (Optional)
+### 📧 Email Digest (Optional)
 If Gmail is configured, the bot will:
 - Run at 4:00 AM daily
 - Read emails from the last 24 hours
 - Use LLM to identify important emails
 - Send you a summary on Telegram
 
-### Smart Lights (Optional)
+### 💡 Smart Lights (Optional)
 Control WIZ lights via natural language:
 - "Turn off the bedroom lights"
 - "Set brightness to 50%"

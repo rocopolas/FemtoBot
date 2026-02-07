@@ -25,7 +25,7 @@ class EventsJob(BackgroundJob):
     
     @property
     def interval_seconds(self) -> int:
-        return 2  # Check every 2 seconds
+        return get_config("EVENTS_CHECK_INTERVAL_SECONDS", 60)
     
     async def run(self, context: ContextTypes.DEFAULT_TYPE):
         """Check events file and send notifications."""
