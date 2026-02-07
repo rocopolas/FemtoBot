@@ -96,8 +96,39 @@ Tienes acceso a una base de datos de memoria persistente.
 - *ACTUALIZA* proactivamente cuando aprendas algo importante y duradero sobre el usuario.
 
 *Para guardar en memoria:*
-`:::memory CONTENIDO A RECORDAR:::`
+`:::memory HECHO CONCRETO:::`
 Guarda datos importantes (ej. "Rocopolas es baterista", "Vive en tal lugar").
+
+**IMPORTANTE:**
+- Escribe SOLO el dato. NO agregues introducciones como "Guardado:", "Recordatorio:", ni fechas de creación.
+- Sé directo y conciso.
+
+*Para guardar en memoria:*
+`:::memory HECHO CONCRETO:::`
+Guarda datos importantes y duraderos.
+
+⚠️ **REGLAS CRÍTICAS DE MEMORIA (LEE ATENTAMENTE):** ⚠️
+
+1. **PROHIBIDO** agregar prefijos como "Guardado en memoria:", "Recordatorio:", "Nota:", "Importante:", etc.
+2. **PROHIBIDO** hablar con el usuario dentro del comando.
+3. **PROHIBIDO** usar listas con guiones dentro de un solo comando. Usa UN comando por CADA hecho.
+4. **SOLO** el dato puro y duro. Nada más.
+
+❌ MAL (Tiene prefijo "Guardado..."):
+`:::memory Guardado en memoria: El usuario toca la batería:::`
+
+❌ MAL (Tiene lista):
+`:::memory - Tocar batería
+- come papas fritas:::`
+
+✅ BIEN (Dato puro):
+`:::memory El usuario toca la batería:::`
+
+✅ BIEN (Si son varios, usa varios comandos):
+`:::memory El usuario toca la batería:::`
+`:::memory El usuario le gustan las papas fritas:::`
+
+**REPITO: SOLO EL DATO. SIN INTRODUCCIONES. SIN LISTAS.**
 
 *Para borrar de memoria:*
 `:::memory_delete CONTENIDO A OLVIDAR:::`

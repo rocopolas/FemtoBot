@@ -36,21 +36,21 @@ def format_bot_response(
     
     # Eliminar comandos internos
     if remove_commands:
-        # Comandos de memoria
-        formatted = re.sub(r':::memory\s+.+?:::', '', formatted, flags=re.DOTALL)
-        formatted = re.sub(r':::memory_delete\s+.+?:::', '', formatted, flags=re.DOTALL)
+        # Comandos de memoria - Allow :::memory::: or :::memory space
+        formatted = re.sub(r':::memory(?::)?\s*.+?:::', '', formatted, flags=re.DOTALL)
+        formatted = re.sub(r':::memory_delete(?::)?\s*.+?:::', '', formatted, flags=re.DOTALL)
         
         # Comandos de cron
-        formatted = re.sub(r':::cron\s+.+?:::', '', formatted)
-        formatted = re.sub(r':::cron_delete\s+.+?:::', '', formatted)
+        formatted = re.sub(r':::cron(?::)?\s*.+?:::', '', formatted)
+        formatted = re.sub(r':::cron_delete(?::)?\s*.+?:::', '', formatted)
         
         # Comandos de búsqueda
-        formatted = re.sub(r':::search\s+.+?:::', '', formatted)
-        formatted = re.sub(r':::foto\s+.+?:::', '', formatted, flags=re.IGNORECASE)
+        formatted = re.sub(r':::search(?::)?\s*.+?:::', '', formatted)
+        formatted = re.sub(r':::foto(?::)?\s*.+?:::', '', formatted, flags=re.IGNORECASE)
         
         # Comandos de dispositivos
-        formatted = re.sub(r':::luz\s+.+?:::', '', formatted, flags=re.IGNORECASE)
-        formatted = re.sub(r':::camara(?:\s+\S+)?:::', '', formatted)
+        formatted = re.sub(r':::luz(?::)?\s*.+?:::', '', formatted, flags=re.IGNORECASE)
+        formatted = re.sub(r':::camara(?::)?(?:\s+\S+)?:::', '', formatted)
     
     return formatted.strip()
 
