@@ -35,7 +35,7 @@ async def download_youtube_audio(url: str) -> str:
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
-            'preferredquality': '128',
+            'preferredquality': '64',
         }],
         'outtmpl': os.path.join(temp_dir, 'audio.%(ext)s'),
         'quiet': False, # Changed to see errors in logs

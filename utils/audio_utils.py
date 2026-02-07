@@ -65,7 +65,15 @@ def unload_whisper_model_large():
 
 def _transcribe_sync(model, audio_path: str, language: str):
     """Synchronous transcription helper."""
-    segments, info = model.transcribe(audio_path, language=language)
+    segments, info = model.transcribe(
+        audio_path, 
+        language=language,
+        beam_size=1,
+        best_of=1,
+        temperature=0,
+        vad_filter=True,
+        vad_parameters=dict(min_silence_duration_ms=500)
+    )
     
     text_parts = []
     for segment in segments:
