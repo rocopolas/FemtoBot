@@ -29,6 +29,7 @@ from src.handlers.commands import CommandHandlers
 from src.handlers.voice import VoiceHandler
 from src.handlers.audio import AudioHandler
 from src.handlers.photo import PhotoHandler
+from src.handlers.video import VideoHandler
 from src.handlers.document import DocumentHandler
 from src.jobs.events import EventsJob
 from src.jobs.inactivity import InactivityJob
@@ -152,6 +153,13 @@ photo_handler = PhotoHandler(
     command_patterns=COMMAND_PATTERNS
 )
 
+video_handler = VideoHandler(
+    chat_manager=chat_manager,
+    is_authorized_func=is_authorized,
+    get_system_prompt_func=get_system_prompt,
+    command_patterns=COMMAND_PATTERNS
+)
+
 document_handler = DocumentHandler(
     chat_manager=chat_manager,
     vector_manager=vector_manager,
@@ -229,6 +237,56 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
         history = await chat_manager.get_history(chat_id)
     
     placeholder_msg = None
+    
+    # --- REPLY UPLOAD HANDLING ---
+    # Check if this is a reply to a media message with upload intent
+    if update.message.reply_to_message:
+        replied_msg = update.message.reply_to_message
+        from src.services.upload_service import UploadService
+        uploader = UploadService()
+        
+        if uploader.is_upload_intent(user_text):
+            media_file = None
+            media_type = None
+            
+            if replied_msg.photo:
+                media_file = await context.bot.get_file(replied_msg.photo[-1].file_id)
+                media_type = "image"
+                ext = ".jpg"
+            elif replied_msg.video:
+                media_file = await context.bot.get_file(replied_msg.video.file_id)
+                media_type = "video"
+                ext = ".mp4"
+            elif replied_msg.document: # Maybe handle docs too?
+                 media_file = await context.bot.get_file(replied_msg.document.file_id)
+                 media_type = "document"
+                 ext = os.path.splitext(replied_msg.document.file_name)[1] or ".tmp"
+
+            if media_file:
+                 status_msg = await update.message.reply_text(f"📤 Preparando {media_type} para subir...")
+                 try:
+                     import tempfile
+                     with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+                        await media_file.download_to_drive(tmp.name)
+                        tmp_path = tmp.name
+                     
+                     await status_msg.edit_text("📤 Subiendo a Catbox.moe...")
+                     url = await asyncio.to_thread(uploader.upload_to_catbox, tmp_path)
+                     
+                     if url:
+                         await status_msg.edit_text(f"✅ Subida completada:\n{url}", disable_web_page_preview=True)
+                     else:
+                         await status_msg.edit_text("❌ Error al subir a Catbox.")
+                         
+                     import os
+                     from contextlib import suppress
+                     with suppress(FileNotFoundError, PermissionError, OSError):
+                        os.unlink(tmp_path)
+                     return # Stop processing
+                 except Exception as e:
+                     logger.error(f"Error handling reply upload: {e}")
+                     await status_msg.edit_text(f"❌ Error: {str(e)}")
+                     return
     
     # --- MEDIA SERVICE HANDLING ---
     media_action = media_service.identify_action(user_text)
@@ -437,6 +495,7 @@ def main():
     application.add_handler(MessageHandler(filters.VOICE, voice_handler.handle))
     application.add_handler(MessageHandler(filters.AUDIO, audio_handler.handle))
     application.add_handler(MessageHandler(filters.PHOTO, photo_handler.handle))
+    application.add_handler(MessageHandler(filters.VIDEO, video_handler.handle))
     application.add_handler(MessageHandler(filters.Document.ALL, document_handler.handle))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     

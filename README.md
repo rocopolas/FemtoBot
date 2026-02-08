@@ -18,6 +18,7 @@ A smart personal assistant designed for small local models, recommended for GPUs
 - ⏰ **Reminders** - Schedule cron tasks that notify you in chat
 - 💡 **Smart lights** - Control WIZ lights via chat
 - 🧮 **Math solver** - Solve complex equations and symbolic math problems
+- 📤 **File upload** - Upload files to Catbox.moe
 
 ## 🤔 Why FemtoBot?
 
@@ -265,6 +266,11 @@ pytest tests/ --cov=src --cov=utils
 ### 🐦 Twitter/X Media Download
 - Send a Twitter/X link and ask to "download" or "bajar"
 - The bot will download the video/image and send the file to you
+
+### 📦 Subida de Archivos (Catbox.moe)
+- **Subida Directa**: Envía una foto o video con el mensaje "sube a catbox" o "dame el link".
+- **Respuesta**: Responde a cualquier imagen o video (tuyo o del bot) con "sube esto" y el bot te devolverá un enlace directo permanente.
+
 
 ### 🔍 Smart Image Search
 - Ask: "Give me a photo of [something]" or "Search for an image of [something]"

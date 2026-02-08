@@ -69,8 +69,26 @@ class PhotoHandler:
                 image_base64 = base64.b64encode(f.read()).decode("utf-8")
             
             # Clean up temp file
+            # Note: We keep the file if we need to upload it, otherwise unlink
+            
+            # Check for upload intent
+            caption = update.message.caption or ""
+            from src.services.upload_service import UploadService
+            uploader = UploadService()
+            
+            if uploader.is_upload_intent(caption):
+                 await self._handle_upload(update, context, tmp_path, status_msg)
+                 # Clean up and return
+                 with suppress(FileNotFoundError, PermissionError, OSError):
+                    os.unlink(tmp_path)
+                 return
+
+            # If not uploading, we can unlink now locally if we had processed it in memory (base64)
+            # But wait! We already read it into base64 above at line 68.
+            # So we can unlink it now if we are not uploading.
             with suppress(FileNotFoundError, PermissionError, OSError):
                 os.unlink(tmp_path)
+
             
             # Get image description from vision model
             client = OllamaClient()
@@ -138,3 +156,22 @@ class PhotoHandler:
         except Exception as e:
             logger.error(f"Error processing photo: {e}")
             await status_msg.edit_text(f"❌ Error: {str(e)}")
+
+    async def _handle_upload(self, update: Update, context: ContextTypes.DEFAULT_TYPE, file_path: str, status_msg):
+        """Helper to handle Catbox upload."""
+        try:
+            from src.services.upload_service import UploadService
+            uploader = UploadService()
+            
+            await status_msg.edit_text("📤 Subiendo a Catbox.moe...")
+            url = await asyncio.to_thread(uploader.upload_to_catbox, file_path)
+            
+            if url:
+                 await status_msg.edit_text(f"✅ Subida completada:\n{url}", disable_web_page_preview=True)
+            else:
+                 await status_msg.edit_text("❌ Error al subir a Catbox.")
+                 
+        except Exception as e:
+            logger.error(f"Error in upload handler: {e}")
+            await status_msg.edit_text(f"❌ Error interno: {str(e)}")
+
