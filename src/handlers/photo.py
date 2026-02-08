@@ -1,4 +1,5 @@
 """Photo/image handler for FemtoBot."""
+import asyncio
 import os
 import base64
 import tempfile
