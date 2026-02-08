@@ -279,14 +279,15 @@ class CronUtils:
 
     @staticmethod
     def cleanup_old_jobs() -> int:
-        """
+        r"""
         Removes one-time cron jobs that have already passed.
-        
-        Returns:
-            Number of jobs removed
+        Handles:
+        1. Explicit year guards: [ "$(date +\%Y)" = "2026" ]
+        2. Implicit one-time jobs: specific min/hour/day/month (no wildcards)
         """
         current_jobs = CronUtils.get_crontab()
         now = datetime.now()
+        current_year = now.year
         jobs_to_keep = []
         removed_count = 0
         
@@ -294,30 +295,53 @@ class CronUtils:
             if not job.strip():
                 continue
             
-            # Check if it's a one-time job (has year check like: [ "$(date +\%Y)" = "2026" ])
-            year_match = re.search(r'\[ "\$\(date \\\+%Y\)" = "(\d{4})" \]', job)
+            parts = job.split()
+            if len(parts) < 5:
+                jobs_to_keep.append(job)
+                continue
+                
+            # --- 1. explicit year guard ---
+            # Try matching [ "$(date +%Y)" = "YYYY" ] OR [ "$(date +\%Y)" = "YYYY" ]
+            # Using raw string r'' for regex reliability
+            year_match = re.search(r'\[ "\$\(date \\?\+%Y\)" = "(\d{4})" \]', job)
             
             if year_match:
-                # This is a one-time job, parse the schedule
-                parts = job.split()
-                if len(parts) >= 5:
-                    try:
-                        minute = int(parts[0])
-                        hour = int(parts[1])
-                        day = int(parts[2])
-                        month = int(parts[3])
-                        year = int(year_match.group(1))
-                        
-                        job_time = datetime(year, month, day, hour, minute)
+                try:
+                    target_year = int(year_match.group(1))
+                    if parts[0].isdigit() and parts[1].isdigit() and parts[2].isdigit() and parts[3].isdigit():
+                        minute, hour, day, month = int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3])
+                        job_time = datetime(target_year, month, day, hour, minute)
                         
                         if job_time < now:
-                            # This job is in the past, don't keep it
                             removed_count += 1
-                            logger.info(f"[CLEANUP] Removing old cron: {job[:60]}...")
+                            logger.info(f"[CLEANUP] Removing expired (explicit): {job[:60]}...")
+                            continue # Don't keep this job
+                except (ValueError, IndexError):
+                    logger.warning(f"Could not parse explicit date in cron: {job[:60]}...")
+
+            # --- 2. implicit one-time job ---
+            # If day and month are specific numbers, assume it's for CURRENT year unless proven otherwise.
+            # Only consider if no year guard was parsed/matched already (or matched and kept)
+            # Actually, if year_match passed but job kept, it means it's future.
+            # The issue is jobs WITHOUT year guard like "Comprar papa"
+            elif not year_match:
+                # Check for: INT INT INT INT * ...
+                if (parts[0].isdigit() and parts[1].isdigit() and 
+                    parts[2].isdigit() and parts[3].isdigit() and 
+                    parts[4] == '*'):
+                    try:
+                        minute, hour, day, month = int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3])
+                        # Assume current year
+                        job_time = datetime(current_year, month, day, hour, minute)
+                        
+                        # If passed, remove
+                        if job_time < now:
+                            removed_count += 1
+                            logger.info(f"[CLEANUP] Removing expired (implicit): {job[:60]}...")
                             continue
-                    except (ValueError, IndexError) as e:
-                        logger.warning(f"Could not parse cron job date: {job[:60]}... - {e}")
-            
+                    except (ValueError, IndexError):
+                        pass
+
             jobs_to_keep.append(job)
         
         if removed_count > 0:
