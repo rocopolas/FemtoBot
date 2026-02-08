@@ -20,7 +20,7 @@ class TUICommandProcessor:
     
     # Pre-compiled patterns
     PATTERNS = {
-        'memory': re.compile(r':::memory\s+(.+?):::', re.DOTALL),
+        'memory': re.compile(r':::memory(?!_delete)\s+(.+?):::', re.DOTALL),
         'memory_delete': re.compile(r':::memory_delete\s+(.+?):::', re.DOTALL),
         'cron': re.compile(r':::cron\s+(.+?)\s+(.+?):::'),
         'cron_delete': re.compile(r':::cron_delete\s+(.+?):::'),

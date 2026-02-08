@@ -72,7 +72,7 @@ email_digest_job = EmailDigestJob(notification_chat_id=NOTIFICATION_CHAT_ID)
 MODEL = get_config("MODEL")
 MATH_MODEL = get_config("MATH_MODEL")
 COMMAND_PATTERNS = {
-    'memory': re.compile(r':::memory(?::)?\s*(.+?):::', re.DOTALL),
+    'memory': re.compile(r':::memory(?!_delete)(?::)?\s*(.+?):::', re.DOTALL),
     'memory_delete': re.compile(r':::memory_delete(?::)?\s*(.+?):::', re.DOTALL),
     'cron': re.compile(r':::cron(?::)?\s*(.+?):::', re.DOTALL),
     'cron_delete': re.compile(r':::cron_delete(?::)?\s*(.+?):::'),
