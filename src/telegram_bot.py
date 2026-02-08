@@ -474,7 +474,7 @@ async def _process_commands(full_response: str, chat_id: int, context: ContextTy
         import re
         # Primero desescapar todos los caracteres precedidos por backslash
         # usando regex para capturar cualquier carácter escapado
-        unescaped = re.sub(r'\\(.)', r'\1', text)
+        unescaped = re.sub(r'\\(.)', lambda m: m.group(1), text)
         return unescaped
     
     # Cron add
