@@ -1,6 +1,6 @@
 # 🤖 FemtoBot
 
-A smart personal assistant that runs locally using [Ollama](https://ollama.ai). Available as a Telegram bot and TUI interface.
+A smart personal assistant designed for small local models, recommended for GPUs with at least 8GB of VRAM. Runs locally using [Ollama](https://ollama.ai). Available as a Telegram bot and TUI interface.
 
 ## ✨ Features
 
@@ -37,7 +37,7 @@ A smart personal assistant that runs locally using [Ollama](https://ollama.ai). 
 - Having a personal assistant that runs on YOUR hardware
 
 ## 📁 Project Structure
-
+```
 FemtoBot/
 ├── config.yaml              # Main configuration
 ├── .env                     # Environment variables (tokens)
