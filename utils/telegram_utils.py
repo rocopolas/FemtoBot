@@ -56,10 +56,28 @@ def format_bot_response(
     # Esto maneja tanto bloques $$...$$ como inline $...$ de forma segura
     formatted = format_math_for_telegram(formatted)
     
-    # Convertir Markdown headers (# Title) a Negrita (*Title*)
-    formatted = re.sub(r'^(?:#{1,6})\s+(.+)$', r'*\1*', formatted, flags=re.MULTILINE)
-    
     return formatted.strip()
+
+
+async def telegramify_content(text: str, max_length: int = 4090):
+    """
+    Usa telegramify-markdown para convertir y dividir el mensaje.
+    Retorna objetos de telegramify con diferentes tipos de contenido (TEXT, PHOTO, FILE).
+    """
+    try:
+        from telegramify_markdown import telegramify, ContentTypes
+        
+        results = await telegramify(text, max_line_length=max_length)
+        return results
+        
+    except ImportError:
+        print("Módulo telegramify_markdown no instalado. Usando fallback.")
+        # Devolver lista de strings como fallback
+        return split_message(text)
+    except Exception as e:
+        # Fallback a split simple si falla
+        print(f"Error en telegramify: {e}")
+        return split_message(text)
 
 
 def escape_markdown(text: str) -> str:
@@ -71,6 +89,117 @@ def escape_markdown(text: str) -> str:
 def escape_code(text: str) -> str:
     """Escapa solo backticks y backslashes para bloques de código."""
     return re.sub(r'([`\\])', r'\\\1', text)
+
+
+async def send_telegramify_results(context, chat_id, results, placeholder_msg=None):
+    """
+    Envía resultados de telegramify_markdown manejando diferentes tipos de contenido.
+    
+    Args:
+        context: Contexto del bot de Telegram
+        chat_id: ID del chat
+        results: Lista de objetos de telegramify
+        placeholder_msg: Mensaje placeholder opcional para editar (solo para el primer mensaje de texto)
+    
+    Returns:
+        Lista de mensajes enviados
+    """
+    from telegramify_markdown import ContentTypes
+    from telegram import InputMediaPhoto, InputFile
+    import io
+    
+    sent_messages = []
+    first_text_sent = False
+    
+    for item in results:
+        try:
+            # Verificar si es string (fallback de split_message)
+            if isinstance(item, str):
+                if not first_text_sent and placeholder_msg:
+                    await placeholder_msg.edit_text(item)
+                    sent_messages.append(placeholder_msg)
+                    first_text_sent = True
+                else:
+                    msg = await context.bot.send_message(chat_id, item)
+                    sent_messages.append(msg)
+                continue
+            
+            # Manejar objetos de telegramify
+            # El contenido ya viene formateado para MarkdownV2
+            if item.content_type == ContentTypes.TEXT:
+                if not first_text_sent and placeholder_msg:
+                    await placeholder_msg.edit_text(item.content, parse_mode="MarkdownV2")
+                    sent_messages.append(placeholder_msg)
+                    first_text_sent = True
+                else:
+                    msg = await context.bot.send_message(
+                        chat_id, 
+                        item.content,
+                        parse_mode="MarkdownV2"
+                    )
+                    sent_messages.append(msg)
+                    
+            elif item.content_type == ContentType.PHOTO:
+                photo_file = io.BytesIO(item.file_data)
+                photo_file.name = item.file_name
+                
+                # La caption ya viene formateada para MarkdownV2 si existe
+                caption = item.caption if hasattr(item, 'caption') else None
+                
+                if not first_text_sent and placeholder_msg:
+                    # No podemos editar un mensaje de texto a foto, borrar y enviar nuevo
+                    await placeholder_msg.delete()
+                    msg = await context.bot.send_photo(
+                        chat_id,
+                        photo=photo_file,
+                        caption=caption,
+                        parse_mode="MarkdownV2" if caption else None
+                    )
+                    sent_messages.append(msg)
+                    first_text_sent = True
+                else:
+                    msg = await context.bot.send_photo(
+                        chat_id,
+                        photo=photo_file,
+                        caption=caption,
+                        parse_mode="MarkdownV2" if caption else None
+                    )
+                    sent_messages.append(msg)
+                    
+            elif item.content_type == ContentTypes.FILE:
+                doc_file = io.BytesIO(item.file_data)
+                doc_file.name = item.file_name
+                
+                # La caption ya viene formateada para MarkdownV2 si existe
+                caption = item.caption if hasattr(item, 'caption') else None
+                
+                if not first_text_sent and placeholder_msg:
+                    await placeholder_msg.delete()
+                    msg = await context.bot.send_document(
+                        chat_id,
+                        document=doc_file,
+                        caption=caption,
+                        parse_mode="MarkdownV2" if caption else None
+                    )
+                    sent_messages.append(msg)
+                    first_text_sent = True
+                else:
+                    msg = await context.bot.send_document(
+                        chat_id,
+                        document=doc_file,
+                        caption=caption,
+                        parse_mode="MarkdownV2" if caption else None
+                    )
+                    sent_messages.append(msg)
+                    
+        except Exception as e:
+            print(f"Error enviando item de telegramify: {e}")
+            # Fallback: intentar enviar como texto simple
+            if hasattr(item, 'content'):
+                msg = await context.bot.send_message(chat_id, item.content)
+                sent_messages.append(msg)
+    
+    return sent_messages
 
 
 def split_message(text, limit=4096):
@@ -278,9 +407,6 @@ def format_math_for_telegram(text: str) -> str:
     # Clean up any remaining LaTeX backslashes before special chars
     text = re.sub(r'\\([a-zA-Z]+)', r'\1', text)
     
-    # Fix double asterisks **bold** -> *bold* for Telegram
-    text = re.sub(r'\*\*(.+?)\*\*', r'*\1*', text)
-
     
     # Ensure numbered lists use proper format
     text = re.sub(r'^(\d+)\.\s+', r'\1\. ', text, flags=re.MULTILINE)

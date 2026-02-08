@@ -8,7 +8,7 @@ import logging
 
 from src.middleware.rate_limiter import rate_limit
 from utils.audio_utils import transcribe_audio_large, is_whisper_available
-from utils.telegram_utils import split_message
+from utils.telegram_utils import split_message, telegramify_content, send_telegramify_results
 
 logger = logging.getLogger(__name__)
 
@@ -71,12 +71,10 @@ class AudioHandler:
             
             # Show transcription only (no LLM processing)
             text = f"📝 *Transcripción de* `{file_name}`:\n\n{transcription}"
-            chunks = split_message(text)
-            for i, chunk in enumerate(chunks):
-                if i == 0:
-                    await status_msg.edit_text(chunk, parse_mode="Markdown")
-                else:
-                    await context.bot.send_message(chat_id, chunk, parse_mode="Markdown")
+            
+            # Split and send chunks using telegramify
+            chunks = await telegramify_content(text)
+            await send_telegramify_results(context, chat_id, chunks, status_msg)
                     
         except Exception as e:
             logger.error(f"Error processing audio: {e}")

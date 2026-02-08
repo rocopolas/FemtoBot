@@ -12,7 +12,7 @@ from src.client import OllamaClient
 from src.state.chat_manager import ChatManager
 from src.middleware.rate_limiter import rate_limit
 from utils.config_loader import get_config
-from utils.telegram_utils import format_bot_response, split_message, prune_history, format_math_for_telegram
+from utils.telegram_utils import format_bot_response, split_message, prune_history, format_math_for_telegram, telegramify_content, send_telegramify_results
 from utils.document_utils import extract_text_from_document, is_supported_document, convert_pdf_to_images
 
 logger = logging.getLogger(__name__)
@@ -154,22 +154,12 @@ class DocumentHandler:
             async for chunk in client.stream_chat(self.model, prune_history(history, get_config("CONTEXT_LIMIT", 30000))):
                 full_response += chunk
             
-            # Format response
-            formatted_response = format_bot_response(full_response)
+            # Format response (clean text)
+            cleaned_text = format_bot_response(full_response)
             
-            # Split and send chunks
-            chunks = split_message(formatted_response)
-            for i, chunk in enumerate(chunks):
-                try:
-                    if i == 0:
-                        await status_msg.edit_text(chunk, parse_mode="Markdown")
-                    else:
-                        await context.bot.send_message(chat_id, chunk, parse_mode="Markdown")
-                except Exception:
-                    if i == 0:
-                        await status_msg.edit_text(chunk)
-                    else:
-                        await context.bot.send_message(chat_id, chunk)
+            # Split and send chunks using telegramify
+            chunks = await telegramify_content(cleaned_text)
+            await send_telegramify_results(context, chat_id, chunks, status_msg)
             
             # Add to history
             await self.chat_manager.append_message(chat_id, {"role": "assistant", "content": full_response})

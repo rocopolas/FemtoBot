@@ -12,7 +12,7 @@ from src.client import OllamaClient
 from src.state.chat_manager import ChatManager
 from src.middleware.rate_limiter import rate_limit
 from utils.config_loader import get_config
-from utils.telegram_utils import format_bot_response, split_message, prune_history
+from utils.telegram_utils import format_bot_response, split_message, prune_history, telegramify_content, send_telegramify_results
 
 logger = logging.getLogger(__name__)
 
@@ -116,10 +116,9 @@ class PhotoHandler:
             # Format response
             formatted_response = format_bot_response(full_response)
             
-            try:
-                await status_msg.edit_text(formatted_response, parse_mode="Markdown")
-            except Exception:
-                await status_msg.edit_text(formatted_response)
+            # Split and send chunks using telegramify (handles TEXT, PHOTO, FILE)
+            chunks = await telegramify_content(formatted_response)
+            await send_telegramify_results(context, chat_id, chunks, status_msg)
             
             # Add to history
             await self.chat_manager.append_message(chat_id, {"role": "assistant", "content": full_response})

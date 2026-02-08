@@ -8,7 +8,7 @@ from src.jobs.base import BackgroundJob
 from src.client import OllamaClient
 from utils.email_utils import fetch_emails_last_24h, format_emails_for_llm, is_gmail_configured
 from utils.config_loader import get_config
-from utils.telegram_utils import format_bot_response, split_message
+from utils.telegram_utils import format_bot_response, split_message, telegramify_content, send_telegramify_results
 import re
 
 logger = logging.getLogger(__name__)
@@ -93,20 +93,9 @@ class EmailDigestJob(BackgroundJob):
             summary = await self._analyze_emails_with_llm(emails_text)
             
             # Send summary with proper formatting
-            chunks = split_message(summary)
-            for i, chunk in enumerate(chunks):
-                try:
-                    if i == 0:
-                        await status_msg.edit_text(chunk, parse_mode="Markdown")
-                    else:
-                        await context.bot.send_message(target_chat, chunk, parse_mode="Markdown")
-                except Exception as md_error:
-                    # Fallback to plain text if markdown fails
-                    logger.warning(f"Markdown parsing failed, sending plain text: {md_error}")
-                    if i == 0:
-                        await status_msg.edit_text(chunk)
-                    else:
-                        await context.bot.send_message(target_chat, chunk)
+            # Use telegramify to format and split
+            chunks = await telegramify_content(summary)
+            await send_telegramify_results(context, target_chat, chunks, status_msg)
             
             logger.info(f"Email digest sent to {target_chat} with {len(emails)} emails")
             
@@ -201,7 +190,7 @@ Responde en español."""
             summary += chunk
         
         # Convertir a formato Telegram y aplicar formato del bot
-        summary = self._convert_to_telegram_markdown(summary)
+        # summary = self._convert_to_telegram_markdown(summary) # Legacy
         summary = format_bot_response(summary)
         
         # Format the response

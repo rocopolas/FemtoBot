@@ -35,7 +35,7 @@ from src.middleware.rate_limiter import rate_limit
 
 from utils.cron_utils import CronUtils
 from utils.config_loader import get_config, get_all_config
-from utils.telegram_utils import split_message, format_bot_response, escape_markdown, prune_history, format_math_for_telegram
+from utils.telegram_utils import split_message, format_bot_response, escape_markdown, prune_history, format_math_for_telegram, telegramify_content, send_telegramify_results
 from utils.youtube_utils import is_youtube_url, download_youtube_audio, get_video_title
 from utils.twitter_utils import is_twitter_url, download_twitter_video, get_twitter_media_url
 from utils.search_utils import BraveSearch
@@ -404,31 +404,26 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
             
             await chat_manager.append_message(chat_id, {"role": "assistant", "content": full_response})
         else:
-            formatted = format_bot_response(full_response)
+            # Clean text first (math, commands, etc.)
+            cleaned_text = format_bot_response(full_response)
             
-            if not formatted:
+            if not cleaned_text:
                 await placeholder_msg.delete()
             else:
-                chunks = split_message(formatted)
-                for i, chunk in enumerate(chunks):
-                    try:
-                        if i == 0:
-                            await placeholder_msg.edit_text(chunk, parse_mode="Markdown")
-                        else:
-                            await context.bot.send_message(chat_id, chunk, parse_mode="Markdown")
-                    except Exception:
-                        if i == 0:
-                            await placeholder_msg.edit_text(chunk)
-                        else:
-                            await context.bot.send_message(chat_id, chunk)
+                # Use telegramify to format and split (handles TEXT, PHOTO, FILE)
+                chunks = await telegramify_content(cleaned_text)
+                await send_telegramify_results(context, chat_id, chunks, placeholder_msg)
             
             await chat_manager.append_message(chat_id, {"role": "assistant", "content": full_response})
         
         # Process commands
         commands_processed = await _process_commands(full_response, chat_id, context)
         
+        # Check if response is empty after formatting but commands were processed
+        response_empty = not formatted if 'formatted' in locals() else not cleaned_text
+        
         # If response is empty after formatting but commands were processed, show confirmation
-        if not formatted and commands_processed:
+        if response_empty and commands_processed:
             try:
                 await placeholder_msg.edit_text("✅ Comandos ejecutados correctamente.")
             except BadRequest:
