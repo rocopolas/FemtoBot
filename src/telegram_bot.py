@@ -4,7 +4,7 @@ import re
 import sys
 import asyncio
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import (
@@ -18,7 +18,6 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
 # Import modular components
-from src.constants import PROJECT_ROOT as CONSTANTS_ROOT
 from src.state.chat_manager import ChatManager
 from src.client import OllamaClient
 from src.memory.vector_store import VectorManager
@@ -33,11 +32,14 @@ from src.jobs.cleanup import CleanupJob
 from src.jobs.email_digest import EmailDigestJob
 from src.middleware.rate_limiter import rate_limit
 
+# Import Services
+from src.services.rag_service import RagService
+from src.services.media_service import MediaService
+from src.services.command_service import CommandService
+
 from utils.cron_utils import CronUtils
 from utils.config_loader import get_config, get_all_config
-from utils.telegram_utils import split_message, format_bot_response, escape_markdown, prune_history, telegramify_content, send_telegramify_results
-from utils.youtube_utils import is_youtube_url, download_youtube_audio, get_video_title
-from utils.twitter_utils import is_twitter_url, download_twitter_video, get_twitter_media_url
+from utils.telegram_utils import split_message, format_bot_response, prune_history, telegramify_content, send_telegramify_results
 from utils.search_utils import BraveSearch
 
 # Load environment variables
@@ -65,6 +67,10 @@ message_queue = asyncio.Queue()
 queue_worker_running = False
 last_activity = datetime.now()
 
+# Initialize Services
+rag_service = RagService(vector_manager)
+media_service = MediaService()
+
 # Initialize email digest job
 email_digest_job = EmailDigestJob(notification_chat_id=NOTIFICATION_CHAT_ID)
 
@@ -82,6 +88,9 @@ COMMAND_PATTERNS = {
     'camara': re.compile(r':::camara(?::)?(?:\s+\S+)?:::'),
     'matematicas': re.compile(r':::matematicas:::'),
 }
+
+# Initialize Command Service
+command_service = CommandService(vector_manager, COMMAND_PATTERNS, PROJECT_ROOT)
 
 # System instructions
 system_instructions = ""
@@ -109,10 +118,6 @@ def load_instructions():
         logger.warning("Instructions file not found")
     except Exception as e:
         logger.error(f"Error loading instructions: {e}")
-
-
-
-# [DELETED] load_memory function
 
 
 def get_system_prompt():
@@ -180,9 +185,6 @@ async def queue_worker():
 voice_handler.queue_worker = queue_worker
 
 
-
-
-
 @rate_limit(max_messages=10, window_seconds=60)
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle text messages."""
@@ -224,22 +226,20 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
     
     placeholder_msg = None
     
-    # Check for Twitter URL
-    twitter_url = is_twitter_url(user_text)
-    if twitter_url:
-        keywords = ["descarga", "baja", "video", "bajar", "download"]
-        if any(k in user_text.lower() for k in keywords):
-            status_msg = await context.bot.send_message(chat_id, "🐦 Analizando Twitter/X...")
+    # --- MEDIA SERVICE HANDLING ---
+    if media_service.is_media_url(user_text):
+        # Twitter
+        twitter_res = await media_service.process_twitter(user_text)
+        if twitter_res:
+            media_path, media_type = twitter_res
+            status_msg = await context.bot.send_message(chat_id, "🐦 Procesando Twitter...")
             try:
-                media_path = await download_twitter_video(twitter_url)
                 await status_msg.edit_text("📤 Subiendo...")
-                
                 with open(media_path, 'rb') as f:
-                    if media_path.endswith(('.jpg', '.png', '.jpeg')):
+                    if media_type == 'photo':
                         await context.bot.send_photo(chat_id, photo=f)
                     else:
                         await context.bot.send_video(chat_id, video=f)
-                
                 import os
                 os.unlink(media_path)
                 await status_msg.delete()
@@ -247,51 +247,37 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
             except Exception as e:
                 await status_msg.edit_text(f"❌ Error: {str(e)}")
                 return
-    
-    # Check for YouTube URL
-    youtube_url = is_youtube_url(user_text)
-    if youtube_url:
-        keywords = ["descarga", "baja", "video", "bajar", "download"]
-        if any(k in user_text.lower() for k in keywords):
-            status_msg = await context.bot.send_message(chat_id, "🎥 Descargando...")
-            try:
-                from utils.youtube_utils import download_youtube_video
-                video_path = await download_youtube_video(youtube_url)
-                await status_msg.edit_text("📤 Subiendo...")
+
+        # YouTube
+        youtube_res = await media_service.process_youtube(user_text)
+        if youtube_res:
+            if len(youtube_res) == 2: # Video download
+                video_path, _ = youtube_res
+                status_msg = await context.bot.send_message(chat_id, "🎥 Descargando video...")
+                try:
+                    await status_msg.edit_text("📤 Subiendo...")
+                    with open(video_path, 'rb') as f:
+                        await context.bot.send_video(chat_id, video=f)
+                    import os
+                    os.unlink(video_path)
+                    await status_msg.delete()
+                    return
+                except Exception as e:
+                    await status_msg.edit_text(f"❌ Error: {str(e)}")
+                    return
+            elif len(youtube_res) == 3: # Transcription
+                transcription, _, video_title = youtube_res
+                status_msg = await context.bot.send_message(chat_id, f"🎙️ Transcribiendo: _{video_title}_...")
                 
-                with open(video_path, 'rb') as f:
-                    await context.bot.send_video(chat_id, video=f)
-                
-                import os
-                os.unlink(video_path)
-                await status_msg.delete()
-                return
-            except Exception as e:
-                await status_msg.edit_text(f"❌ Error: {str(e)}")
-                return
-        
-        # Process for transcription
-        try:
-            status_msg = await context.bot.send_message(chat_id, "🎥 Descargando audio...")
-            video_title = get_video_title(youtube_url)
-            audio_path = await download_youtube_audio(youtube_url)
-            
-            from utils.audio_utils import transcribe_audio
-            await status_msg.edit_text(f"🎙️ Transcribiendo: _{video_title}_...")
-            transcription = await transcribe_audio(audio_path)
-            
-            import os
-            os.unlink(audio_path)
-            
-            user_text = (
-                f"Analiza esta transcripción de YouTube '{video_title}':\n\n"
-                f"\"\"\"\n{transcription}\n\"\"\"\n\n"
-                f"Haz un resumen detallado."
-            )
-            placeholder_msg = status_msg
-        except Exception as e:
-            await context.bot.send_message(chat_id, f"❌ Error: {str(e)}")
-            return
+                # Update user text with transcription request
+                user_text = (
+                    f"Analiza esta transcripción de YouTube '{video_title}':\n\n"
+                    f"\"\"\"\n{transcription}\n\"\"\"\n\n"
+                    f"Haz un resumen detallado."
+                )
+                placeholder_msg = status_msg
+
+    # --- LLM + RAG ---
     
     # Generate response (Send "..." immediately)
     await context.bot.send_chat_action(chat_id=chat_id, action="typing")
@@ -309,32 +295,8 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
     crontab_lines = CronUtils.get_crontab()
     crontab_str = "\n".join(crontab_lines) if crontab_lines else "(vacío)"
     
-    # RAG Context Retrieval
-    rag_context = ""
-    try:
-        # Search both collections
-        docs_results = await vector_manager.search(user_text, collection_type="documents", limit=3)
-        mem_results = await vector_manager.search(user_text, collection_type="memory", limit=3)
-        
-        # Combine and sort by similarity
-        all_results = docs_results + mem_results
-        all_results.sort(key=lambda x: x['similarity'], reverse=True)
-        
-        # Take top 3
-        search_results = all_results[:3]
-        
-        if search_results:
-             logger.info(f"🔍 RAG Results found: {len(search_results)}")
-             rag_entries = [
-                f"- {res['content']} (Sim: {res['similarity']:.2f})"
-                for res in search_results
-            ]
-             rag_context = "\n\n# Contexto Recuperado (RAG)\n" + "\n".join(rag_entries)
-             logger.info(f"📄 RAG Context injected: {rag_context}")
-        else:
-             logger.info("❌ No RAG results found.")
-    except Exception as e:
-        logger.error(f"RAG Error: {e}")
+    # RAG Context Retrieval via Service
+    rag_context = await rag_service.get_context(user_text)
 
     context_message = f"{user_text} [Sistema: La hora actual es {current_time}. Agenda: {crontab_str}.{rag_context}]"
     await chat_manager.append_message(chat_id, {"role": "user", "content": context_message})
@@ -415,8 +377,8 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
             
             await chat_manager.append_message(chat_id, {"role": "assistant", "content": full_response})
         
-        # Process commands
-        commands_processed = await _process_commands(full_response, chat_id, context)
+        # Process commands via Service
+        commands_processed = await command_service.process_commands(full_response, chat_id, context)
         
         # Check if response is empty after formatting but commands were processed
         response_empty = not formatted if 'formatted' in locals() else not cleaned_text
@@ -430,7 +392,6 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
         
     except Exception as e:
         logger.error(f"Error processing message: {e}")
-        logger.error(f"Error processing message: {e}")
         try:
             if placeholder_msg:
                 await placeholder_msg.edit_text(f"❌ Error: {str(e)}")
@@ -441,153 +402,10 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
             await context.bot.send_message(chat_id, f"❌ Error: {str(e)}")
 
 
-async def _process_commands(full_response: str, chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """Process internal commands from LLM response.
-    
-    Returns:
-        True if any commands were processed, False otherwise
-    """
-    from utils.wiz_utils import control_light
-    from src.constants import PROJECT_ROOT
-    
-    commands_processed = False
-    
-    # Cron delete
-    for match in COMMAND_PATTERNS['cron_delete'].finditer(full_response):
-        commands_processed = True
-        target = match.group(1).strip()
-        from utils.telegram_utils import escape_markdown, escape_code
-        target_esc = escape_code(target)
-        await context.bot.send_message(
-            chat_id,
-            f"🗑️ Eliminando: `{target_esc}`",
-            parse_mode="Markdown"
-        )
-        if CronUtils.delete_job(target):
-            await context.bot.send_message(chat_id, "✅ Tarea eliminada.")
-        else:
-            await context.bot.send_message(chat_id, "⚠️ No se encontraron tareas.")
-    
-    def _unescape_telegram_markdown(text: str) -> str:
-        """Desescapa caracteres escapados de Markdown de Telegram."""
-        import re
-        # Primero desescapar todos los caracteres precedidos por backslash
-        # usando regex para capturar cualquier carácter escapado
-        unescaped = re.sub(r'\\(.)', lambda m: m.group(1), text)
-        return unescaped
-    
-    # Cron add
-    for match in COMMAND_PATTERNS['cron'].finditer(full_response):
-        commands_processed = True
-        # Parse cron content: "Min Hora Dia Mes DOW Comando"
-        cron_content = match.group(1).strip()
-        
-        # Desescapar primero
-        cron_content = _unescape_telegram_markdown(cron_content)
-        
-        logger.info(f"[CRON] Raw content: '{cron_content}'")
-        
-        # Split into parts - need at least 6 parts (5 schedule + command)
-        parts = cron_content.split(None, 5)
-        if len(parts) < 6:
-            logger.error(f"[CRON] Invalid cron format, expected 6 parts, got {len(parts)}: {cron_content}")
-            await context.bot.send_message(chat_id, f"❌ Error: Formato cron inválido. Se esperaban 6 campos, se obtuvieron {len(parts)}.")
-            continue
-        
-        # Extract schedule and command
-        min_field, hour_field, day_field, month_field, dow_field = parts[0], parts[1], parts[2], parts[3], parts[4]
-        command = parts[5].strip()
-        
-        schedule = f"{min_field} {hour_field} {day_field} {month_field} {dow_field}"
-        
-        logger.info(f"[CRON] Parsed schedule: '{schedule}'")
-        logger.info(f"[CRON] Parsed command: '{command}'")
-        
-        if command.endswith(":"):
-            command = command[:-1].strip()
-        
-        # Handle echo commands - ensure they redirect to the correct events file
-        if "echo" in command:
-            events_file = os.path.join(PROJECT_ROOT, get_config("EVENTS_FILE"))
-            # Force correct events file
-            if ">>" in command:
-                # Strip entire existing redirection (including path)
-                command = command.split(">>")[0].strip()
-            # Append correct path
-            command += f" >> {events_file}"
-        
-        from utils.telegram_utils import escape_markdown, escape_code
-        
-        sched_esc = escape_code(schedule)
-        cmd_esc = escape_code(command)
-        
-        await context.bot.send_message(
-            chat_id,
-            f"⚠️ Agregando: `{sched_esc} {cmd_esc}`",
-            parse_mode="Markdown"
-        )
-        
-        success = CronUtils.add_job(schedule, command)
-        if success:
-            await context.bot.send_message(chat_id, "✅ Tarea agregada.")
-        else:
-            await context.bot.send_message(chat_id, "❌ Error al agregar. Si programaste para 'en X minutos', es posible que el procesamiento haya tardado demasiado. Intenta programar con más margen (ej: 'en 5 minutos' o más).")
-    
-    # Memory delete
-    for match in COMMAND_PATTERNS['memory_delete'].finditer(full_response):
-        commands_processed = True
-        target = match.group(1).strip()
-        if target:
-            try:
-                if await vector_manager.delete_memory(target):
-                    await context.bot.send_message(
-                        chat_id, 
-                        f"🗑️ Memoria borrada: _{target}_",
-                         parse_mode="Markdown"
-                    )
-                else:
-                     await context.bot.send_message(chat_id, f"⚠️ No encontré recuerdos similares a: _{target}_", parse_mode="Markdown")
-            except Exception as e:
-                await context.bot.send_message(chat_id, f"⚠️ Error borrando memoria: {str(e)}")
-    
-    # Memory add
-    for match in COMMAND_PATTERNS['memory'].finditer(full_response):
-        commands_processed = True
-        content = match.group(1).strip()
-        if content:
-            try:
-                # Save ONLY to Vector DB
-                if await vector_manager.add_memory(content):
-                    await context.bot.send_message(
-                        chat_id,
-                        f"💾 Guardado (DB): _{content}_",
-                        parse_mode="Markdown"
-                    )
-                else:
-                     await context.bot.send_message(chat_id, "❌ Error al guardar en DB.")
-
-            except Exception as e:
-                await context.bot.send_message(chat_id, f"⚠️ Error: {str(e)}")
-    
-    # Light control
-    for match in COMMAND_PATTERNS['luz'].finditer(full_response):
-        commands_processed = True
-        name = match.group(1).strip()
-        action = match.group(2).strip()
-        value = match.group(3).strip() if match.group(3) else None
-        
-        result = await control_light(name, action, value)
-        await context.bot.send_message(chat_id, result)
-    
-    return commands_processed
-
-
 def main():
     """Main entry point."""
     # Load initial data
-    # Load initial data
     load_instructions()
-    # memory load removed
     
     # Build application
     application = ApplicationBuilder().token(TOKEN).build()
@@ -639,7 +457,7 @@ def main():
         name=cleanup_job.name
     )
     
-    # Email digest job - checks every minute if it's 4:00 AM
+    # Email digest job - runs daily at 4:00 AM
     if NOTIFICATION_CHAT_ID:
         application.job_queue.run_repeating(
             email_digest_job.run,

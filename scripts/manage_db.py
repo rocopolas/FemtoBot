@@ -9,14 +9,21 @@ import logging
 logging.basicConfig(level=logging.ERROR)
 
 def get_db_path():
-    # Assuming script is in /scripts and data in /data
-    # Determine the directory of the script
+    # Assuming script is in /scripts
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    # Go up one level to the project root
     project_root = os.path.dirname(script_dir)
-    # Construct path to data/chroma_db
-    db_path = os.path.join(project_root, 'data', 'chroma_db')
-    return db_path
+    
+    # Add project root to sys.path to allow imports from src
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+        
+    try:
+        from src.constants import DATA_DIR
+        db_path = os.path.join(DATA_DIR, 'chroma_db')
+        return db_path
+    except ImportError:
+        # Fallback if src.constants cannot be imported
+        return os.path.join(project_root, 'data', 'chroma_db')
 
 def connect_db():
     db_path = get_db_path()

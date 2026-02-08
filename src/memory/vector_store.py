@@ -33,7 +33,8 @@ class VectorManager:
         logger.info(f"VectorManager Config: Threshold={self.similarity_threshold}, Max={self.max_results}")
         
         # Initialize ChromaDB
-        persist_path = os.path.join("data", "chroma_db")
+        from src.constants import DATA_DIR
+        persist_path = os.path.join(DATA_DIR, "chroma_db")
         os.makedirs(persist_path, exist_ok=True)
         
         self.chroma = chromadb.PersistentClient(path=persist_path)
