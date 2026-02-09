@@ -15,8 +15,11 @@ class OllamaClient:
     """
     Client for interacting with Ollama API.
     
-    Provides streaming chat, image description, and model management.
+    Uses a single persistent httpx.AsyncClient to avoid
+    creating a new TCP connection on every request.
     """
+    
+    _shared_client: Optional[httpx.AsyncClient] = None
     
     def __init__(self, base_url: str = "http://localhost:11434") -> None:
         """
@@ -27,6 +30,13 @@ class OllamaClient:
         """
         self.base_url = base_url
         logger.debug(f"OllamaClient initialized with base_url: {base_url}")
+
+    @classmethod
+    def _get_client(cls) -> httpx.AsyncClient:
+        """Get or create the shared httpx client."""
+        if cls._shared_client is None or cls._shared_client.is_closed:
+            cls._shared_client = httpx.AsyncClient(timeout=None)
+        return cls._shared_client
 
     async def stream_chat(
         self, 
@@ -59,64 +69,64 @@ class OllamaClient:
             "stream": True 
         }
         
-        async with httpx.AsyncClient() as client:
-            try:
-                async with client.stream(
-                    "POST", 
-                    url, 
-                    json=payload, 
-                    timeout=None
-                ) as response:
-                    if response.status_code != 200:
-                        error_detail = ""
-                        try:
-                            async for chunk in response.aiter_text():
-                                error_detail += chunk
-                        except Exception:
-                            pass
-                        error_msg = (
-                            f"Error: Ollama returned status {response.status_code}. "
-                            f"Details: {error_detail}"
-                        )
-                        logger.error(error_msg)
-                        yield error_msg
-                        return
+        client = self._get_client()
+        try:
+            async with client.stream(
+                "POST", 
+                url, 
+                json=payload, 
+                timeout=None
+            ) as response:
+                if response.status_code != 200:
+                    error_detail = ""
+                    try:
+                        async for chunk in response.aiter_text():
+                            error_detail += chunk
+                    except Exception:
+                        pass
+                    error_msg = (
+                        f"Error: Ollama returned status {response.status_code}. "
+                        f"Details: {error_detail}"
+                    )
+                    logger.error(error_msg)
+                    yield error_msg
+                    return
 
-                    async for line in response.aiter_lines():
-                        if not line:
-                            continue
-                        try:
-                            data = json.loads(line)
-                            if "message" in data:
-                                content = data["message"].get("content", "")
-                                if content:
-                                    yield content
-                            if data.get("done", False):
-                                break
-                        except json.JSONDecodeError:
-                            logger.warning(f"Failed to parse JSON line: {line[:100]}...")
-                            continue
-                            
-            except httpx.ConnectError as e:
-                error_msg = (
-                    "Error: No se pudo conectar a Ollama. "
-                    "Asegúrate de que 'ollama serve' esté corriendo."
-                )
-                logger.error(f"Connection error to Ollama: {e}")
-                yield error_msg
-                
-            except httpx.RemoteProtocolError as e:
-                error_msg = (
-                    "Error: La conexión con Ollama se cerró inesperadamente. "
-                    "(Posible crash del modelo o timeout)."
-                )
-                logger.error(f"Remote protocol error: {e}")
-                yield error_msg
-                
-            except Exception as e:
-                error_msg = f"Error: {str(e)}"
-                logger.error(f"Unexpected error in stream_chat: {e}", exc_info=True)
-                yield error_msg
+                async for line in response.aiter_lines():
+                    if not line:
+                        continue
+                    try:
+                        data = json.loads(line)
+                        if "message" in data:
+                            content = data["message"].get("content", "")
+                            if content:
+                                yield content
+                        if data.get("done", False):
+                            break
+                    except json.JSONDecodeError:
+                        logger.warning(f"Failed to parse JSON line: {line[:100]}...")
+                        continue
+                        
+        except httpx.ConnectError as e:
+            error_msg = (
+                "Error: No se pudo conectar a Ollama. "
+                "Asegúrate de que 'ollama serve' esté corriendo."
+            )
+            logger.error(f"Connection error to Ollama: {e}")
+            yield error_msg
+            
+        except httpx.RemoteProtocolError as e:
+            error_msg = (
+                "Error: La conexión con Ollama se cerró inesperadamente. "
+                "(Posible crash del modelo o timeout)."
+            )
+            logger.error(f"Remote protocol error: {e}")
+            yield error_msg
+            
+        except Exception as e:
+            error_msg = f"Error: {str(e)}"
+            logger.error(f"Unexpected error in stream_chat: {e}", exc_info=True)
+            yield error_msg
 
     async def unload_model(self, model: str) -> bool:
         """
@@ -134,10 +144,10 @@ class OllamaClient:
             "keep_alive": 0
         }
         try:
-            async with httpx.AsyncClient() as client:
-                await client.post(url, json=payload)
-                logger.info(f"Successfully unloaded model: {model}")
-                return True
+            client = self._get_client()
+            await client.post(url, json=payload)
+            logger.info(f"Successfully unloaded model: {model}")
+            return True
         except Exception as e:
             logger.warning(f"Failed to unload model {model}: {e}")
             return False
@@ -173,17 +183,17 @@ class OllamaClient:
         }
         
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(url, json=payload, timeout=120.0)
-                if response.status_code == 200:
-                    data = response.json()
-                    description = data.get("message", {}).get("content", "[Sin descripción]")
-                    logger.debug(f"Image described successfully with model {model}")
-                    return description
-                else:
-                    error_msg = f"[Error del modelo de visión: {response.status_code}]"
-                    logger.error(f"Vision model error: {error_msg}")
-                    return error_msg
+            client = self._get_client()
+            response = await client.post(url, json=payload, timeout=120.0)
+            if response.status_code == 200:
+                data = response.json()
+                description = data.get("message", {}).get("content", "[Sin descripción]")
+                logger.debug(f"Image described successfully with model {model}")
+                return description
+            else:
+                error_msg = f"[Error del modelo de visión: {response.status_code}]"
+                logger.error(f"Vision model error: {error_msg}")
+                return error_msg
                     
         except httpx.ConnectError as e:
             logger.error(f"Connection error in describe_image: {e}")
@@ -215,15 +225,15 @@ class OllamaClient:
         }
         
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(url, json=payload, timeout=30.0)
-                if response.status_code == 200:
-                    data = response.json()
-                    embedding = data.get("embedding", [])
-                    return embedding
-                else:
-                    logger.error(f"Embedding error {response.status_code}: {response.text}")
-                    return []
+            client = self._get_client()
+            response = await client.post(url, json=payload, timeout=30.0)
+            if response.status_code == 200:
+                data = response.json()
+                embedding = data.get("embedding", [])
+                return embedding
+            else:
+                logger.error(f"Embedding error {response.status_code}: {response.text}")
+                return []
                     
         except Exception as e:
             logger.error(f"Error generating embedding: {e}")
