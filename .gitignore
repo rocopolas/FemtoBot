@@ -5,3 +5,6 @@
 **/__pycache__/
 /.pytest_cache
 /data/chroma_db
+/dist/
+/build/
+*.egg-info/

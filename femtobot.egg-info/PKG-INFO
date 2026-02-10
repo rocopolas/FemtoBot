@@ -192,15 +192,19 @@ git clone https://github.com/rocopolas/FemtoBot.git
 cd FemtoBot
 ```
 
-2. **Install as CLI tool:**
+2. **Setup & install CLI:**
 ```bash
-python3.12 -m venv venv_bot
-source venv_bot/bin/activate
-pip install -e .
+chmod +x run.sh && ./run.sh   # Creates venv + installs deps + starts bot
+```
+Once the venv is ready, install the `femtobot` command system-wide:
+```bash
+chmod +x scripts/install_cli.sh
+./scripts/install_cli.sh       # Requires sudo
 ```
 
-3. **Use from anywhere:**
+3. **Use from anywhere (no venv activation needed):**
 ```bash
+# Bot management
 femtobot serve     # Start bot (foreground)
 femtobot start     # Start bot (background daemon)
 femtobot stop      # Stop the daemon
@@ -209,23 +213,21 @@ femtobot status    # Show bot + Ollama status
 femtobot logs      # Show recent logs
 femtobot logs -f   # Follow logs in real-time
 femtobot tui       # Launch TUI interface
+
+# Configuration & setup
 femtobot config    # Show current configuration
+femtobot setup     # Download Ollama models from config.yaml
+femtobot update    # Git pull + reinstall dependencies
+femtobot doctor    # Run full diagnostic checks
+
+# Memory (RAG)
+femtobot memory status           # Show memory stats
+femtobot memory search "query"   # Search vector memory
+
+# Backup & restore
+femtobot backup              # Backup data + config to ~/.femtobot/
+femtobot restore backup.tar.gz   # Restore from backup
 ```
-
-**Alternative (auto-setup script):**
-
-```bash
-# Linux
-chmod +x run.sh && ./run.sh
-
-# macOS
-chmod +x run.command && ./run.command
-
-# Windows
-run.bat
-```
-
-The script will automatically create venv, install deps, check Ollama and start the bot.
 
 3. **Configure environment variables:**
 ```bash
