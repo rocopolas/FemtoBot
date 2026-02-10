@@ -1,5 +1,8 @@
 import re
+import logging
 from typing import List
+
+logger = logging.getLogger(__name__)
 
 
 async def telegramify_content(text: str, max_length: int = 4090):
@@ -14,10 +17,10 @@ async def telegramify_content(text: str, max_length: int = 4090):
         return results
         
     except ImportError:
-        print("Módulo telegramify_markdown no instalado. Usando fallback.")
+        logger.warning("Módulo telegramify_markdown no instalado. Usando fallback.")
         return split_message(text)
     except Exception as e:
-        print(f"Error en telegramify: {e}")
+        logger.error(f"Error en telegramify: {e}", exc_info=True)
         return split_message(text)
 
 
@@ -143,7 +146,7 @@ async def send_telegramify_results(context, chat_id, results, placeholder_msg=No
                     sent_messages.append(msg)
                     
         except Exception as e:
-            print(f"Error enviando item de telegramify: {e}")
+            logger.error(f"Error enviando item de telegramify: {e}", exc_info=True)
             # Fallback: intentar enviar como texto simple
             if hasattr(item, 'text'):
                 msg = await context.bot.send_message(chat_id, item.text)
@@ -220,8 +223,8 @@ def format_bot_response(response: str) -> str:
     formatted = re.sub(r':::memory_delete(?::)?\s*.+?:::', '', formatted, flags=re.DOTALL)
     
     # Handle cron commands
-    formatted = re.sub(r':::cron(?::)?\s*.+?:::', '', formatted)
-    formatted = re.sub(r':::cron_delete(?::)?\s*.+?:::', '', formatted)
+    formatted = re.sub(r':::cron(?::)?\s*.+?:::', '', formatted, flags=re.DOTALL)
+    formatted = re.sub(r':::cron_delete(?::)?\s*.+?:::', '', formatted, flags=re.DOTALL)
     
     # Handle search commands
     formatted = re.sub(r':::search(?::)?\s*.+?:::', '', formatted)

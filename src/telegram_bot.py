@@ -187,6 +187,12 @@ async def queue_worker():
                 await process_message_item(update, context, use_reply=needs_reply, text_override=text_override)
             except Exception as e:
                 logger.error(f"Error processing text message in queue: {e}", exc_info=True)
+                # Notify user about the error
+                try:
+                    chat_id = update.effective_chat.id
+                    await context.bot.send_message(chat_id, f"❌ Error procesando mensaje: {e}")
+                except Exception:
+                    pass
             
             message_queue.task_done()
     finally:
@@ -480,6 +486,20 @@ async def process_message_item(update: Update, context: ContextTypes.DEFAULT_TYP
             await context.bot.send_message(chat_id, f"❌ Error: {str(e)}")
 
 
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Global error handler for unhandled exceptions."""
+    logger.error(f"Unhandled exception: {context.error}", exc_info=context.error)
+    # Try to notify the user
+    if update and hasattr(update, 'effective_chat') and update.effective_chat:
+        try:
+            await context.bot.send_message(
+                update.effective_chat.id,
+                f"❌ Error inesperado: {context.error}"
+            )
+        except Exception:
+            pass
+
+
 def main():
     """Main entry point."""
     # Load initial data
@@ -487,6 +507,7 @@ def main():
     
     # Build application
     application = ApplicationBuilder().token(TOKEN).build()
+    application.add_error_handler(error_handler)
     
     # Command handlers
     application.add_handler(CommandHandler("start", command_handlers.start))
