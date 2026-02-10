@@ -1,4 +1,5 @@
-# 🤖 FemtoBot
+
+![FemtoBot Logo](https://files.catbox.moe/zhkn08.jpg)
 
 A smart personal assistant designed for small local models, recommended for GPUs with at least 8GB of VRAM. Runs locally using [Ollama](https://ollama.ai). Available as a Telegram bot and TUI interface.
 
@@ -19,6 +20,13 @@ A smart personal assistant designed for small local models, recommended for GPUs
 - 💡 **Smart lights** - Control WIZ lights via chat
 - 🧮 **Math solver** - Solve complex equations and symbolic math problems
 - 📤 **File upload** - Upload files to Catbox.moe
+
+**Catbox.moe**
+![FemtoBot in action](https://files.catbox.moe/rpkd1y.jpg)
+**Math solver**
+![FemtoBot in action](https://files.catbox.moe/ltdliq.jpg)
+**Youtube summary**
+![FemtoBot in action](https://files.catbox.moe/c9b2ct.jpg)
 
 ## 🤔 Why FemtoBot?
 
@@ -100,15 +108,61 @@ FemtoBot/
 └── assets/                  # Resources
     └── styles.tcss          # TUI styles
 ```
+## System Architecture
+
+```
+┌─────────────────────────────────────────────┐
+│         User Interfaces                     │
+│  ┌──────────────┐    ┌─────────────────┐    │
+│  │   Telegram   │    │   TUI (Textual) │    │
+│  │    Bot       │    │   (Terminal)    │    │
+│  └──────┬───────┘    └────────┬──────── ┘   │
+└─────────┼─────────────────────┼─────────────┘
+          │                     │
+          └──────────┬──────────┘
+                     │
+┌────────────────────┴────────────────────────┐
+│          Message Processing Layer           │
+│  - Queue-based sequential processing        │
+│  - Command parsing (:::command:::)          │
+│  - Media handling (voice, photo, docs)      │
+└────────────────────┬────────────────────────┘
+                     │
+┌────────────────────┴────────────────────────┐
+│          LLM Integration (Ollama)           │
+│  - Streaming chat API                       │
+│  - Vision model for image analysis          │
+│  - Context management with pruning          │
+└────────────────────┬────────────────────────┘
+                     │
+┌────────────────────┴────────────────────────┐
+│           Utility Services                  │
+│  ┌─────────┐ ┌─────────┐ ┌─────────────┐    │
+│  │ Whisper │ │  Brave  │ │  YouTube    │    │
+│  │(Speech) │ │ Search  │ │  Download   │    │
+│  └─────────┘ └─────────┘ └─────────────┘    │
+│  ┌─────────┐ ┌─────────┐ ┌─────────────┐    │
+│  │  WIZ    │ │  Cron   │ │  Gmail      │    │
+│  │ Lights  │ │ Jobs    │ │  IMAP       │    │
+│  └─────────┘ └─────────┘ └─────────────┘    │
+│  ┌─────────┐ ┌─────────┐ ┌─────────────┐    │
+│  │   OCR   │ │  Math   │ │  Catbox     │    │
+│  │ Service │ │ Solver  │ │  Uploads    │    │
+│  └─────────┘ └─────────┘ └─────────────┘    │
+│  ┌─────────┐ ┌─────────┐ ┌─────────────┐    │
+│  │   RAG   │ │  Docs   │ │  Calendar   │    │
+│  │ System  │ │ Reader  │ │   Events    │    │
+│  └─────────┘ └─────────┘ └─────────────┘    │
+└─────────────────────────────────────────────┘
+```
 
 ## 🚀 Quick Start
 
 ### Requirements
-- Python 3.12+
+- **Python 3.12** (Strictly required)
 - [Ollama](https://ollama.ai) installed and running
 - FFmpeg (for audio transcription)
 - **ChromaDB** (installed automatically)
-
 
 ### Installation & Run
 
@@ -133,7 +187,6 @@ chmod +x run.command
 ./run.command
 
 # Option 2: Double-click run.command in Finder
-# (You may need to right-click → Open the first time)
 ```
 
 **Windows:**
@@ -145,25 +198,34 @@ run.bat
 ```
 
 The script will automatically:
-- Create virtual environment (if needed)
-- Install Python 3.12 (if not present on Linux)
-- Install all dependencies
+- Create virtual environment `venv_bot`
+- Install all dependencies from `requirements.txt`
+- Check for Ollama connectivity
 - Start the bot
 
-3. **Configure environment variables:
+3. **Configure environment variables:**
 ```bash
 cp .env.example .env
-# Edit .env with your tokens
+# Edit .env with your tokens (Telegram, Brave, Gmail)
 ```
 
 4. **Download Models:**
 ```bash
 # Chat Model
-ollama pull llama3.1:latest
+ollama pull qwen3:8b
+
+# Vision Model
+ollama pull qwen3-vl:2b
+
+# Math Model
+ollama pull qwen2-math:7b
+
+# OCR Model
+ollama pull glm-ocr:latest
 
 # Embedding Model (Required for RAG)
 ollama pull nomic-embed-text
-# or qwen3-embedding:0.6b (configure in config.yaml)
+# (You may need to update config.yaml if using a different embedding model)
 ```
 
 ## ⚙️ Configuration
