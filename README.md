@@ -234,7 +234,6 @@ If you prefer to configure the environment yourself:
 
 ---
 
-
 ### ⚙️ Initial Configuration
 
 Before running the bot, you need to set up the necessary keys and models.
