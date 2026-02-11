@@ -156,88 +156,133 @@ FemtoBot/
 └─────────────────────────────────────────────┘
 ```
 
-## 🚀 Quick Start
+## 🚀 Installation & Setup
 
-### Requirements
+FemtoBot is designed to be easy to install and runs entirely locally. You can use the automated setup script or install it manually.
+
+### 📋 Prerequisites
+
 - **Python 3.12** (Strictly required)
-- [Ollama](https://ollama.ai) installed and running
-- FFmpeg (for audio transcription)
-- **ChromaDB** (installed automatically)
+- **Git** needed to clone the repository
+- **[Ollama](https://ollama.ai)** installed and running (`ollama serve`)
+- **FFmpeg** required for audio transcription features
 
-### Installation & Run
+---
 
-1. **Clone the repository:**
+### ⚡ Option 1: Automated Installation (Recommended)
+
+This is the fastest way to get started. The `run.sh` script handles environment creation and dependencies.
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/rocopolas/FemtoBot.git
+    cd FemtoBot
+    ```
+
+2.  **Run the setup script:**
+    ```bash
+    chmod +x run.sh
+    ./run.sh
+    ```
+    This script will:
+    - Check for Python 3.12
+    - Create a virtual environment (`venv_bot`)
+    - Install all required dependencies
+    - specificy `femtobot` command installation
+
+3.  **Install the System-wide CLI (Optional):**
+    To use the `femtobot` command from any terminal:
+    ```bash
+    chmod +x scripts/install_cli.sh
+    sudo ./scripts/install_cli.sh # requires sudo
+    ```
+
+---
+
+### 📦 Option 2: Installing from a release
+
+If you just want to install the package without cloning the repo:
+
 ```bash
-git clone https://github.com/rocopolas/FemtoBot.git
-cd FemtoBot
+pip install https://github.com/rocopolas/FemtoBot/releases/download/v1.0.3/femtobot-1.0.0-py3-none-any.whl
 ```
 
-2. **Setup & install CLI:**
+---
+
+### 🛠️ Option 3: Manual Installation
+
+If you prefer to configure the environment yourself:
+
+1.  **Clone and enter the directory:**
+    ```bash
+    git clone https://github.com/rocopolas/FemtoBot.git
+    cd FemtoBot
+    ```
+
+2.  **Create and activate virtual environment:**
+    ```bash
+    python3.12 -m venv venv_bot
+    source venv_bot/bin/activate
+    # On Windows: venv_bot\Scripts\activate
+    ```
+
+3.  **Install dependencies:**
+    ```bash
+    pip install --upgrade pip
+    pip install -r requirements.txt
+    ```
+
+---
+
+
+### ⚙️ Initial Configuration
+
+Before running the bot, you need to set up the necessary keys and models.
+
+1.  **Environment Variables:**
+    Copy the example template and add your credentials.
+    ```bash
+    cp .env.example .env
+    nano .env  # Use your preferred editor
+    ```
+    **Required:** `TELEGRAM_TOKEN`, `AUTHORIZED_USERS`.
+
+2.  **Download Ollama Models:**
+    FemtoBot requires specific models to function. You can download the defaults with:
+
+    ```bash
+    # Chat Model
+    ollama pull qwen3:8b
+
+    # Vision Model
+    ollama pull qwen3-vl:2b   
+
+    # Embedding Model (Vital for RAG memory)
+    ollama pull qwen3-embedding:0.6b
+    ```
+    *Tip: You can change these models later in `config.yaml`.*
+
+---
+
+### 🖥️ CLI Commands
+
+Once installed, you can manage FemtoBot using the CLI:
+
 ```bash
-chmod +x run.sh && ./run.sh   # Creates venv + installs deps + starts bot
-```
-Once the venv is ready, install the `femtobot` command system-wide:
-```bash
-chmod +x scripts/install_cli.sh
-./scripts/install_cli.sh       # Requires sudo
-```
+# Core Commands
+femtobot start      # Start the bot daemon
+femtobot stop       # Stop the daemon
+femtobot status     # Check bot and Ollama connection
+femtobot logs -f    # View real-time logs
 
-3. **Use from anywhere (no venv activation needed):**
-```bash
-# Bot management
-femtobot serve     # Start bot (foreground)
-femtobot start     # Start bot (background daemon)
-femtobot stop      # Stop the daemon
-femtobot restart   # Restart the daemon
-femtobot status    # Show bot + Ollama status
-femtobot logs      # Show recent logs
-femtobot logs -f   # Follow logs in real-time
-femtobot tui       # Launch TUI interface
-
-# Configuration & setup
-femtobot config    # Show current configuration
-femtobot setup     # Download Ollama models from config.yaml
-femtobot update    # Git pull + reinstall dependencies
-femtobot doctor    # Run full diagnostic checks
-
-# Memory (RAG)
-femtobot memory status           # Show memory stats
-femtobot memory search "query"   # Search vector memory
-
-# Backup & restore
-femtobot backup              # Backup data + config to ~/.femtobot/
-femtobot restore backup.tar.gz   # Restore from backup
+# Tools
+femtobot tui        # Open the Terminal User Interface
+femtobot config     # View current configuration
+femtobot setup      # Auto-pull models from config.yaml
+femtobot doctor     # Diagnose issues
+femtobot update     # Pull setup updates
 ```
 
-**Installing from a release:**
-```bash
-pip install https://github.com/rocopolas/FemtoBot/releases/download/v1.0.0/femtobot-1.0.0-py3-none-any.whl
-```
-
-3. **Configure environment variables:**
-```bash
-cp .env.example .env
-# Edit .env with your tokens (Telegram, Brave, Gmail)
-```
-
-4. **Download Models:**
-```bash
-# Chat Model
-ollama pull qwen3:8b
-
-# Vision Model
-ollama pull qwen3-vl:2b
-
-# Math Model
-ollama pull qwen2-math:7b
-
-# OCR Model
-ollama pull glm-ocr:latest
-
-# Embedding Model (Required for RAG)
-ollama pull nomic-embed-text
-# (You may need to update config.yaml if using a different embedding model)
-```
 
 ## ⚙️ Configuration
 
@@ -340,10 +385,9 @@ pytest tests/ --cov=src --cov=utils
 - Send a Twitter/X link and ask to "download" or "bajar"
 - The bot will download the video/image and send the file to you
 
-### 📦 Subida de Archivos (Catbox.moe)
-- **Subida Directa**: Envía una foto o video con el mensaje "sube a catbox" o "dame el link".
-- **Respuesta**: Responde a cualquier imagen o video (tuyo o del bot) con "sube esto" y el bot te devolverá un enlace directo permanente.
-
+### 📦 File Upload (Catbox.moe)
+- **Direct Upload**: Send a photo or video with the message "upload to catbox" or "give me the link".
+- **Reply**: Reply to any image or video (yours or the bot's) with "upload this" and the bot will return a permanent direct link.
 
 ### 🔍 Smart Image Search
 - Ask: "Give me a photo of [something]" or "Search for an image of [something]"
