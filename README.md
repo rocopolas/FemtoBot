@@ -200,17 +200,7 @@ This is the fastest way to get started. The `run.sh` script handles environment 
 
 ---
 
-### 📦 Option 2: Installing from a release
-
-If you just want to install the package without cloning the repo:
-
-```bash
-pip install https://github.com/rocopolas/FemtoBot/releases/download/v1.1.3/femtobot-1.0.0-py3-none-any.whl
-```
-
----
-
-### 🛠️ Option 3: Manual Installation
+### 🛠️ Option 2: Manual Installation
 
 If you prefer to configure the environment yourself:
 
@@ -234,6 +224,17 @@ If you prefer to configure the environment yourself:
     ```
 
 ---
+
+### 📦 Option 3: Installing from a release (Not Recommended)
+
+If you just want to install the package without cloning the repo:
+
+```bash
+pip install https://github.com/rocopolas/FemtoBot/releases/download/v1.1.3/femtobot-1.0.0-py3-none-any.whl
+```
+
+---
+
 
 ### ⚙️ Initial Configuration
 
