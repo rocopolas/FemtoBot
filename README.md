@@ -16,6 +16,7 @@ A smart personal assistant designed for small local models, recommended for GPUs
 - 🖼️ **Image search** - Search for images on the web
 - 📄 **Document reading** - Analyze and chat with PDF or text files
 - 📧 **Email digest** - Read and summarize emails from Gmail
+- 🧠 **Deep Research** - Perform iterative research on a topic
 - ⏰ **Reminders** - Schedule cron tasks that notify you in chat
 - 💡 **Smart lights** - Control WIZ lights via chat
 - 🧮 **Math solver** - Solve complex equations and symbolic math problems
@@ -204,7 +205,7 @@ This is the fastest way to get started. The `run.sh` script handles environment 
 If you just want to install the package without cloning the repo:
 
 ```bash
-pip install https://github.com/rocopolas/FemtoBot/releases/download/v1.0.4/femtobot-1.0.0-py3-none-any.whl
+pip install https://github.com/rocopolas/FemtoBot/releases/download/v1.1.0/femtobot-1.0.0-py3-none-any.whl
 ```
 
 ---
@@ -457,6 +458,16 @@ WIZ_LIGHTS:
 ```
 
 **Requires**: `pip install pywizlight`
+
+### 🧠 Deep Research
+- **Command**: `/deep <topic>`
+- **Function**: Performs an iterative research process on the given topic.
+- **Process**:
+  1.  Analyzes the topic and decides on search queries.
+  2.  Uses **Brave Search** to gather information.
+  3.  Summarizes findings and repeats the process (up to 5 iterations).
+  4.  Generates a comprehensive **ODT Report** (OpenDocument Text).
+  5.  Sends the report to you via Telegram.
 
 ## 🔧 Development
 

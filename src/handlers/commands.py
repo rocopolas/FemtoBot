@@ -210,3 +210,57 @@ class CommandHandlers:
         
         logger.info(f"Manual email digest triggered by user {user_id}")
         await self.email_digest_job.run_manual(context, chat_id)
+
+    async def deep_research(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /deep command - deep research mode."""
+        user_id = update.effective_user.id
+        chat_id = update.effective_chat.id
+        
+        if not self.is_authorized(user_id):
+            await update.message.reply_text(
+                f"⛔ No tienes acceso.",
+                parse_mode="Markdown"
+            )
+            return
+
+        # Get the prompt
+        if not context.args:
+            await update.message.reply_text("⚠️ Please provide a topic. Usage: `/deep <topic>`", parse_mode="Markdown")
+            return
+            
+        topic = " ".join(context.args)
+        
+        status_msg = await update.message.reply_text(f"🧠 Starting deep research on: *{topic}*...\nThis may take a few minutes.", parse_mode="Markdown")
+        
+        from src.services.deep_research_service import DeepResearchService
+        service = DeepResearchService()
+        
+        async def status_callback(msg):
+            try:
+                # Append to the existing message or send a new one if it's too long?
+                # For now, just edit the message to show current status
+                await status_msg.edit_text(f"🧠 Deep Research: *{topic}*\n\n{msg}", parse_mode="Markdown")
+            except Exception as e:
+                logger.warning(f"Failed to update status message: {e}")
+        
+        try:
+            file_path = await service.research(topic, chat_id, status_callback)
+            
+            await status_msg.edit_text("✅ Research complete! Sending report...")
+            
+            await update.message.reply_document(
+                document=open(file_path, 'rb'),
+                filename=os.path.basename(file_path),
+                caption=f"📊 Research Report: {topic}"
+            )
+            
+            # Clean up: delete the file after sending
+            try:
+                os.remove(file_path)
+                logger.info(f"Deleted research report: {file_path}")
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to delete research report {file_path}: {cleanup_error}") 
+            
+        except Exception as e:
+            logger.error(f"Deep research failed: {e}", exc_info=True)
+            await status_msg.edit_text(f"❌ Research failed: {str(e)}")

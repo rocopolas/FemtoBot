@@ -515,6 +515,7 @@ def main():
     application.add_handler(CommandHandler("unload", command_handlers.unload_models))
     application.add_handler(CommandHandler("restart", command_handlers.restart_bot))
     application.add_handler(CommandHandler("digest", command_handlers.email_digest))
+    application.add_handler(CommandHandler("deep", command_handlers.deep_research))
     
     # Message handlers
     application.add_handler(MessageHandler(filters.VOICE, voice_handler.handle))

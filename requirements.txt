@@ -10,3 +10,5 @@ pymupdf
 python-docx
 pywizlight
 yt-dlp
+odfpy
+markdown
