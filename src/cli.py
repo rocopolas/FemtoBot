@@ -386,48 +386,108 @@ def setup():
 
 @cli.command()
 def update():
-    """Update FemtoBot (git pull + install dependencies)."""
+    """Update FemtoBot (git pull OR install latest release)."""
     click.secho("=== FemtoBot Update ===\n", fg=CYAN, bold=True)
 
-    # Git pull
-    click.secho("  Pulling latest changes...", fg=CYAN)
-    result = subprocess.run(
-        ["git", "pull"],
-        cwd=PROJECT_ROOT,
-        capture_output=True, text=True,
-    )
-    if result.returncode == 0:
-        output = result.stdout.strip()
-        if "Already up to date" in output:
-            click.secho("  ✓ Already up to date", fg=GREEN)
-        else:
-            click.secho(f"  ✓ Updated:\n{output}", fg=GREEN)
-    else:
-        click.secho(f"  ✗ Git pull failed: {result.stderr.strip()}", fg=RED)
-        return
-
-    # Install deps
-    click.secho("  Installing dependencies...", fg=CYAN)
+    git_dir = os.path.join(PROJECT_ROOT, ".git")
     python = _get_python()
-    result = subprocess.run(
-        [python, "-m", "pip", "install", "-r", "requirements.txt", "--quiet"],
-        cwd=PROJECT_ROOT,
-        capture_output=True, text=True,
-    )
-    if result.returncode == 0:
-        click.secho("  ✓ Dependencies updated", fg=GREEN)
-    else:
-        click.secho(f"  ✗ pip install failed: {result.stderr.strip()}", fg=RED)
-        return
 
-    # Re-install package
-    result = subprocess.run(
-        [python, "-m", "pip", "install", "-e", ".", "--quiet"],
-        cwd=PROJECT_ROOT,
-        capture_output=True, text=True,
-    )
-    if result.returncode == 0:
-        click.secho("  ✓ CLI re-installed", fg=GREEN)
+    if os.path.isdir(git_dir):
+        # --- GIT UPDATE STRATEGY ---
+        click.secho("  Pulling latest changes (git)...", fg=CYAN)
+        result = subprocess.run(
+            ["git", "pull"],
+            cwd=PROJECT_ROOT,
+            capture_output=True, text=True,
+        )
+        if result.returncode == 0:
+            output = result.stdout.strip()
+            if "Already up to date" in output:
+                click.secho("  ✓ Already up to date", fg=GREEN)
+            else:
+                click.secho(f"  ✓ Updated:\n{output}", fg=GREEN)
+        else:
+            click.secho(f"  ✗ Git pull failed: {result.stderr.strip()}", fg=RED)
+            return
+
+        # Install deps
+        click.secho("  Installing dependencies...", fg=CYAN)
+        result = subprocess.run(
+            [python, "-m", "pip", "install", "-r", "requirements.txt", "--quiet"],
+            cwd=PROJECT_ROOT,
+            capture_output=True, text=True,
+        )
+        if result.returncode == 0:
+            click.secho("  ✓ Dependencies updated", fg=GREEN)
+        else:
+            click.secho(f"  ✗ pip install failed: {result.stderr.strip()}", fg=RED)
+            return
+
+        # Re-install package editable
+        result = subprocess.run(
+            [python, "-m", "pip", "install", "-e", ".", "--quiet"],
+            cwd=PROJECT_ROOT,
+            capture_output=True, text=True,
+        )
+        if result.returncode == 0:
+            click.secho("  ✓ CLI re-installed", fg=GREEN)
+
+    else:
+        # --- GITHUB RELEASE STRATEGY ---
+        click.secho("  Git not found. Checking latest release on GitHub...", fg=CYAN)
+        try:
+            import httpx
+            resp = httpx.get("https://api.github.com/repos/rocopolas/FemtoBot/releases/latest", timeout=10.0)
+            
+            if resp.status_code == 404:
+                click.secho("  ✗ No releases found on GitHub repo.", fg=RED)
+                return
+            
+            if resp.status_code != 200:
+                click.secho(f"  ✗ Failed to fetch releases: HTTP {resp.status_code}", fg=RED)
+                return
+
+            data = resp.json()
+            tag_name = data.get("tag_name", "unknown")
+            assets = data.get("assets", [])
+            
+            whl_url = None
+            for asset in assets:
+                if asset["name"].endswith(".whl"):
+                    whl_url = asset["browser_download_url"]
+                    break
+            
+            if not whl_url:
+                click.secho(f"  ✗ No .whl file found in release {tag_name}", fg=RED)
+                return
+
+            click.secho(f"  Found release: {tag_name}", fg=GREEN)
+            click.secho("  Upgrading package via pip...", fg=CYAN)
+            
+            # Install the wheel
+            install_cmd = [python, "-m", "pip", "install", "--upgrade", whl_url]
+            
+            # Show output for transparency
+            proc = subprocess.Popen(
+                install_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            stdout, stderr = proc.communicate()
+            
+            if proc.returncode == 0:
+                click.secho(f"  ✓ Successfully upgraded to {tag_name}", fg=GREEN)
+            else:
+                click.secho(f"  ✗ Upgrade failed:\n{stderr}", fg=RED)
+                return
+
+        except ImportError:
+            click.secho("  ✗ 'httpx' library missing (required for updates).", fg=RED)
+            return
+        except Exception as e:
+            click.secho(f"  ✗ Error during update: {e}", fg=RED)
+            return
 
     click.echo()
     click.secho("✓ Update complete!", fg=GREEN)

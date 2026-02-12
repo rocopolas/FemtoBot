@@ -22,6 +22,8 @@ dependencies = [
     "python-docx",
     "pywizlight",
     "yt-dlp",
+    "odfpy",
+    "markdown"
 ]
 
 [project.scripts]
