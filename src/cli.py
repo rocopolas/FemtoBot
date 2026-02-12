@@ -5,6 +5,7 @@ import signal
 import subprocess
 import time
 import click
+import tempfile
 
 # Resolve project root from this file's location
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -332,6 +333,15 @@ def setup():
     """Download required Ollama models from config.yaml."""
     import yaml
 
+    # Check Python version
+    v = sys.version_info
+    if v.major < 3 or (v.major == 3 and v.minor < 12):
+        click.secho(f"⚠ Warning: You are running Python {v.major}.{v.minor}.{v.micro}", fg=YELLOW)
+        click.secho("  FemtoBot is designed for Python 3.12+. Some features may not work.", fg=YELLOW)
+        if not click.confirm("  Do you want to continue anyway?", default=False):
+            return
+    else:
+        click.secho(f"✓ Python {v.major}.{v.minor}.{v.micro} detected", fg=GREEN)
 
     # Ensure config directory exists
     from src.constants import CONFIG_DIR, DATA_DIR
@@ -463,7 +473,8 @@ def setup():
 
     # Check Ollama
     if not _check_ollama():
-        click.secho("✗ Ollama is not running. Start it with 'ollama serve'", fg=RED)
+        click.secho("✗ Ollama is not running.", fg=RED)
+        click.secho("  Please start Ollama (e.g. 'ollama serve') and RUN 'femtobot setup' AGAIN to download models.", fg=YELLOW)
         return
 
     # Get already-downloaded models
@@ -808,6 +819,50 @@ def doctor():
     else:
         click.secho(f"  ✗ Python {v.major}.{v.minor} (3.12 required)", fg=RED)
         issues += 1
+        
+        # Auto-install offer
+        if click.confirm("  Would you like to try installing Python 3.12 automatically? (Linux only)", default=True):
+            try:
+                import importlib.resources
+                import subprocess
+                import stat
+                
+                # Extract script to temp file
+                try:
+                    # Python 3.9+
+                    import src.scripts
+                    script_content = importlib.resources.read_text("src.scripts", "install_python.sh")
+                except ImportError:
+                    # Fallback for older python or dev mode
+                    script_path = os.path.join(PROJECT_ROOT, "src", "scripts", "install_python.sh")
+                    if os.path.exists(script_path):
+                        with open(script_path, "r") as f:
+                            script_content = f.read()
+                    else:
+                        raise FileNotFoundError("Scripts package not found")
+
+                tmp_script = os.path.join(tempfile.gettempdir(), "femtobot_install_python.sh")
+                with open(tmp_script, "w") as f:
+                    f.write(script_content)
+                
+                # Make executable
+                os.chmod(tmp_script, os.stat(tmp_script).st_mode | stat.S_IEXEC)
+                
+                click.secho("  Running installer... (requires sudo)", fg=CYAN)
+                ret_code = subprocess.call([tmp_script])
+                
+                if ret_code == 0:
+                    click.secho("  ✓ Python 3.12 installed! You may need to create a new venv.", fg=GREEN)
+                else:
+                    click.secho("  ✗ Installation failed.", fg=RED)
+                
+                # Cleanup
+                if os.path.exists(tmp_script):
+                    os.remove(tmp_script)
+                    
+            except Exception as e:
+                click.secho(f"  ✗ Failed to run installer: {e}", fg=RED)
+
 
     # 2. Venv
     # 2. Venv (Dev mode only)

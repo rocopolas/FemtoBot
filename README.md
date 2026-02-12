@@ -237,30 +237,32 @@ If you prefer to configure the environment yourself:
 
 ### ⚙️ Initial Configuration
 
-Before running the bot, you need to set up the necessary keys and models.
+After installation, run the setup command to initialize your environment:
 
-1.  **Environment Variables:**
-    Copy the example template and add your credentials.
-    ```bash
-    cp .env.example .env
-    nano .env  # Use your preferred editor
-    ```
-    **Required:** `TELEGRAM_TOKEN`, `AUTHORIZED_USERS`.
+```bash
+femtobot setup
+```
 
-2.  **Download Ollama Models:**
-    FemtoBot requires specific models to function. You can download the defaults with:
+This interactive command will:
+1.  **Configure Environment**: Prompt you for your Telegram Token, Authorized Users, and other settings to create your `.env` file automatically.
+2.  **Download Models**: Automatically pull the necessary Ollama models (Chat, Vision, Embeddings) defined in `config.yaml`.
+3.  **Create Data Files**: Initialize default instructions and memory files.
 
-    ```bash
-    # Chat Model
-    ollama pull qwen3:8b
+*Note: Ensure [Ollama](https://ollama.com/) is running (`ollama serve`) before running setup.*
 
-    # Vision Model
-    ollama pull qwen3-vl:2b   
+### 🏥 System Check
 
-    # Embedding Model (Vital for RAG memory)
-    ollama pull qwen3-embedding:0.6b
-    ```
-    *Tip: You can change these models later in `config.yaml`.*
+After setup, it is highly recommended to run the doctor command to verify your installation:
+
+```bash
+femtobot doctor
+```
+
+This will check for:
+- Correct Python version
+- Virtual environment activation (if applicable)
+- Configuration file validity
+- Ollama connectivity and model availability
 
 ---
 
