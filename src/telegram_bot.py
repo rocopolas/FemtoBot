@@ -68,6 +68,41 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+class TokenRedactFilter(logging.Filter):
+    """Filter to redact sensitive tokens from log messages."""
+    
+    def __init__(self, token=None):
+        super().__init__()
+        self.token = token
+        # Pattern to match bot tokens in URLs
+        self.token_pattern = re.compile(r'bot\d+:[A-Za-z0-9_-]+')
+    
+    def filter(self, record):
+        if hasattr(record, 'msg') and isinstance(record.msg, str):
+            record.msg = self._redact(record.msg)
+        if hasattr(record, 'args') and record.args:
+            record.args = tuple(
+                self._redact(str(arg)) if isinstance(arg, str) else arg
+                for arg in record.args
+            )
+        return True
+    
+    def _redact(self, text):
+        """Redact token from text."""
+        if self.token:
+            text = text.replace(self.token, '***REDACTED***')
+        # Also redact any bot token pattern
+        text = self.token_pattern.sub('bot***REDACTED***', text)
+        return text
+
+
+# Apply token redaction filter to httpx and other loggers
+token_filter = TokenRedactFilter(TOKEN)
+logging.getLogger('httpx').addFilter(token_filter)
+logging.getLogger('httpcore').addFilter(token_filter)
+logging.getLogger('telegram').addFilter(token_filter)
+
 # Global instances
 chat_manager = ChatManager(max_inactive_hours=24)
 vector_manager = VectorManager(get_all_config(), OllamaClient())

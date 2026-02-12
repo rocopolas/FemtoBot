@@ -8,6 +8,8 @@
 /dist/
 /build/
 *.egg-info/
+*.log
 femtobot.log
 femtobot.pid
 .bot.pid
+*.pid
