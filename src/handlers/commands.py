@@ -5,7 +5,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 import logging
 
-from src.constants import PROJECT_ROOT
+
 from src.state.chat_manager import ChatManager
 from src.middleware.rate_limiter import rate_limit
 from src.client import OllamaClient

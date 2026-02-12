@@ -20,6 +20,7 @@ sys.path.insert(0, _ABS_ROOT)
 
 # Absolute project root (works from any working directory)
 PROJECT_ROOT = _ABS_ROOT
+from src.constants import CONFIG_DIR
 
 # Import modular components
 from src.state.chat_manager import ChatManager
@@ -87,7 +88,7 @@ COMMAND_PATTERNS = {
     'memory_delete': re.compile(r':::memory_delete(?::)?\s*(.+?):::', re.DOTALL),
     'cron': re.compile(r':::cron(?::)?\s*(.+?):::', re.DOTALL),
     'cron_delete': re.compile(r':::cron_delete(?::)?\s*(.+?):::'),
-    'search': re.compile(r':::search(?::)?\s*(.+?):::'),
+    'search': re.compile(r':::search(?::)?\s*(.+?):::', re.DOTALL),
     'foto': re.compile(r':::foto(?::)?\s*(.+?):::', re.IGNORECASE),
     'luz': re.compile(r':::luz(?::)?\s+(\S+)\s+(\S+)(?:\s+(\S+))?:::'),
     'camara': re.compile(r':::camara(?::)?(?:\s+\S+)?:::'),
@@ -95,7 +96,7 @@ COMMAND_PATTERNS = {
 }
 
 # Initialize Command Service
-command_service = CommandService(vector_manager, COMMAND_PATTERNS, PROJECT_ROOT)
+command_service = CommandService(vector_manager, COMMAND_PATTERNS, CONFIG_DIR)
 
 # System instructions
 system_instructions = ""
@@ -112,8 +113,8 @@ def load_instructions():
     """Load system instructions from file."""
     global system_instructions
     try:
-        from src.constants import PROJECT_ROOT
-        instructions_path = os.path.join(PROJECT_ROOT, get_config("INSTRUCTIONS_FILE"))
+        from src.constants import CONFIG_DIR
+        instructions_path = os.path.join(CONFIG_DIR, get_config("INSTRUCTIONS_FILE"))
         with open(instructions_path, "r", encoding="utf-8") as f:
             content = f.read().strip()
             if content:

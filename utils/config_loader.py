@@ -11,14 +11,34 @@ _config_path: Optional[str] = None
 
 # Default configuration values
 DEFAULT_CONFIG = {
-    "MODEL": "llama3.1:8b",
-    "CONTEXT_LIMIT": 32000,
-    "VISION_MODEL": None,
-    "WHISPER_MODEL_VOICE": "base",
-    "WHISPER_MODEL_AUDIO": "large",
-    "INSTRUCTIONS_FILE": "data/instructions.md",
-    "MEMORY_FILE": "data/memory.md",
+    "MODEL": "qwen3:8b",
+    "VISION_MODEL": "qwen3-vl:2b",
+    "MATH_MODEL": "qwen2-math:7b",
+    "OCR_MODEL": "glm-ocr:latest",
+    "CONTEXT_LIMIT": 30000,
+    "WHISPER_LANGUAGE": "es",
+    "WHISPER_MODEL_VOICE": "turbo",
+    "WHISPER_MODEL_EXTERNAL": "turbo",
+    "INACTIVITY_TIMEOUT_MINUTES": 60,
+    "CRON_CLEANUP_INTERVAL_MINUTES": 30,
+    "TIMEZONE_OFFSET_HOURS": -3,
+    "EMAIL_DIGEST_TIME": "08:00",
+    "EVENTS_CHECK_INTERVAL_SECONDS": 60,
     "EVENTS_FILE": "data/events.txt",
+    "INSTRUCTIONS_FILE": "data/instructions.md",
+    "WIZ_LIGHTS": {
+        "luz_esquina": "192.168.0.122",
+        "luz_solitaria": "192.168.0.64",
+        "luz_cama": "192.168.0.117",
+        "pieza": ["192.168.0.122", "192.168.0.64", "192.168.0.117"]
+    },
+    "RAG": {
+        "EMBEDDING_MODEL": "qwen3-embedding:0.6b",
+        "CHUNK_SIZE": 1000,
+        "CHUNK_OVERLAP": 200,
+        "SIMILARITY_THRESHOLD": 0.4,
+        "MAX_RESULTS": 3
+    }
 }
 
 
@@ -27,10 +47,11 @@ class ConfigError(Exception):
     pass
 
 
+from src.constants import CONFIG_DIR
+
 def get_config_path() -> str:
     """Gets the absolute path to config.yaml."""
-    # config.yaml is in the project root (parent of utils/)
-    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config.yaml"))
+    return os.path.join(CONFIG_DIR, "config.yaml")
 
 
 def load_config(force_reload: bool = False) -> Dict[str, Any]:

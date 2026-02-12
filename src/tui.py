@@ -15,7 +15,7 @@ import sys
 _ABS_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ABS_ROOT)
 
-from src.constants import PROJECT_ROOT
+from src.constants import CONFIG_DIR, ASSETS_DIR
 from src.state.chat_manager import ChatManager
 from src.client import OllamaClient
 from src.tui_utils.history_manager import TUIHistoryManager
@@ -73,7 +73,7 @@ class MessageWidget(Markdown):
 class FemtoBotApp(App):
     """Main TUI application."""
     
-    CSS_PATH = os.path.join(PROJECT_ROOT, "assets", "styles.tcss")
+    CSS_PATH = os.path.join(ASSETS_DIR, "styles.tcss")
     TITLE = "FemtoBot TUI"
     SUB_TITLE = "Powered by Ollama"
     
@@ -99,14 +99,14 @@ class FemtoBotApp(App):
         self.chat_id = -1
         
         # File watcher
-        self.events_file = os.path.join(PROJECT_ROOT, get_config("EVENTS_FILE"))
+        self.events_file = os.path.join(CONFIG_DIR, get_config("EVENTS_FILE"))
         if not os.path.exists(self.events_file):
             open(self.events_file, 'w').close()
         
         # Load system instructions (synchronously)
         self._system_instructions = ""
         try:
-            instructions_path = os.path.join(PROJECT_ROOT, get_config("INSTRUCTIONS_FILE"))
+            instructions_path = os.path.join(CONFIG_DIR, get_config("INSTRUCTIONS_FILE"))
             with open(instructions_path, "r", encoding="utf-8") as f:
                 self._system_instructions = f.read().strip()
         except FileNotFoundError:

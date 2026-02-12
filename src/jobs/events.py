@@ -5,7 +5,7 @@ from telegram.ext import ContextTypes
 import logging
 
 from src.jobs.base import BackgroundJob
-from src.constants import PROJECT_ROOT
+from src.constants import CONFIG_DIR
 from utils.config_loader import get_config
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ class EventsJob(BackgroundJob):
     def __init__(self, notification_chat_id: int = None, authorized_users: list = None):
         self.notification_chat_id = notification_chat_id
         self.authorized_users = authorized_users or []
-        self.events_file = os.path.join(PROJECT_ROOT, get_config("EVENTS_FILE"))
+        self.events_file = os.path.join(CONFIG_DIR, get_config("EVENTS_FILE"))
     
     @property
     def name(self) -> str:

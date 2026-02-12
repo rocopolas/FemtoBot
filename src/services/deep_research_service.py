@@ -14,7 +14,7 @@ from odf.teletype import addTextToElement
 from src.client import OllamaClient
 from utils.search_utils import BraveSearch
 from utils.config_loader import get_config
-from src.constants import PROJECT_ROOT
+from src.constants import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -93,10 +93,13 @@ class DeepResearchService:
         safe_topic = safe_topic[:50]
         
         filename = f"report_{safe_topic}_{timestamp}.odt"
-        file_path = os.path.join(PROJECT_ROOT, "data", filename)
+
+
+        filename = f"report_{safe_topic}_{timestamp}.odt"
+        file_path = os.path.join(DATA_DIR, filename)
         
         # Ensure data directory exists
-        os.makedirs(os.path.join(PROJECT_ROOT, "data"), exist_ok=True)
+        os.makedirs(DATA_DIR, exist_ok=True)
         
         self._create_odt(topic, report_markdown, file_path)
         

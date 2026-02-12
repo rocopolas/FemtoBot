@@ -8,9 +8,10 @@ import click
 
 # Resolve project root from this file's location
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FEMTOBOT_DIR = os.path.expanduser("~/.femtobot")
-PID_FILE = os.path.join(FEMTOBOT_DIR, "femtobot.pid")
-LOG_FILE = os.path.join(FEMTOBOT_DIR, "femtobot.log")
+from src.constants import CONFIG_DIR, DATA_DIR
+
+PID_FILE = os.path.join(CONFIG_DIR, "femtobot.pid")
+LOG_FILE = os.path.join(CONFIG_DIR, "femtobot.log")
 
 # Colors
 GREEN = "green"
@@ -21,7 +22,7 @@ CYAN = "cyan"
 
 def _ensure_dir():
     """Ensure ~/.femtobot directory exists."""
-    os.makedirs(FEMTOBOT_DIR, exist_ok=True)
+    os.makedirs(CONFIG_DIR, exist_ok=True)
 
 
 def _read_pid():
@@ -77,8 +78,16 @@ def serve():
     """Start the Telegram bot in foreground (blocking)."""
     click.secho("🚀 Starting FemtoBot (foreground)...", fg=CYAN)
 
-    # Ensure we're in the project directory for relative imports
-    os.chdir(PROJECT_ROOT)
+    # Check if daemon is running
+    pid = _read_pid()
+    if _is_running(pid):
+        click.secho(f"⚠ FemtoBot daemon is already running (PID {pid})", fg=RED)
+        click.secho("  Run 'femtobot stop' first, or 'femtobot logs -f' to monitor it.", fg=YELLOW)
+        return
+
+    # Ensure we're in the config directory for relative paths
+    _ensure_dir()
+    os.chdir(CONFIG_DIR)
     sys.path.insert(0, PROJECT_ROOT)
 
     # Check Ollama
@@ -114,7 +123,7 @@ def start():
     with open(LOG_FILE, "a") as log:
         proc = subprocess.Popen(
             [python, bot_script],
-            cwd=PROJECT_ROOT,
+            cwd=CONFIG_DIR,
             stdout=log,
             stderr=log,
             start_new_session=True,
@@ -282,7 +291,7 @@ def tui():
     """Launch the TUI (terminal) interface."""
     click.secho("🖥️  Starting FemtoBot TUI...", fg=CYAN)
 
-    os.chdir(PROJECT_ROOT)
+    os.chdir(CONFIG_DIR)
     sys.path.insert(0, PROJECT_ROOT)
 
     from src.tui import FemtoBotApp
@@ -293,7 +302,7 @@ def tui():
 @cli.command()
 def config():
     """Show current configuration."""
-    config_path = os.path.join(PROJECT_ROOT, "config.yaml")
+    config_path = os.path.join(CONFIG_DIR, "config.yaml")
 
     if not os.path.exists(config_path):
         click.secho("✗ config.yaml not found", fg=RED)
@@ -323,13 +332,115 @@ def setup():
     """Download required Ollama models from config.yaml."""
     import yaml
 
-    config_path = os.path.join(PROJECT_ROOT, "config.yaml")
-    if not os.path.exists(config_path):
-        click.secho("✗ config.yaml not found", fg=RED)
-        return
 
+    # Ensure config directory exists
+    from src.constants import CONFIG_DIR, DATA_DIR
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    os.makedirs(DATA_DIR, exist_ok=True)
+
+    config_path = os.path.join(CONFIG_DIR, "config.yaml")
+
+    # Create config if missing
+    if not os.path.exists(config_path):
+        click.secho(f"⚠ config.yaml not found at {config_path}", fg=YELLOW)
+        click.secho("  Creating default configuration...", fg=CYAN)
+        
+        from utils.config_loader import DEFAULT_CONFIG
+        # Update paths in default config to be absolute or relative to CONFIG_DIR correctly
+        # Actually, DEFAULT_CONFIG uses relative paths like "data/instructions.md"
+        # which will resolve relative to where the bot is run/configured.
+        
+        try:
+            with open(config_path, "w") as f:
+                yaml.dump(DEFAULT_CONFIG, f, default_flow_style=False)
+            click.secho("  ✓ Created config.yaml", fg=GREEN)
+        except Exception as e:
+            click.secho(f"  ✗ Failed to create config.yaml: {e}", fg=RED)
+            return
+
+    # Check for .env
+    env_path = os.path.join(CONFIG_DIR, ".env")
+    if not os.path.exists(env_path):
+        click.secho(f"⚠ .env not found at {env_path}", fg=YELLOW)
+        click.secho("  Configuration required:", fg=CYAN)
+        
+        telegram_token = click.prompt("🤖 Telegram Bot Token", type=str)
+        auth_users = click.prompt("👥 Authorized Users (comma-separated IDs)", type=str)
+        notif_chat = click.prompt("📢 Notification Chat ID", default=auth_users.split(',')[0].strip(), show_default=True)
+        
+        click.echo("\n--- Optional Integrations (press Enter to skip) ---")
+        brave_key = click.prompt("🔍 Brave Search API Key", default="", show_default=False)
+        gmail_user = click.prompt("📧 Gmail User", default="", show_default=False)
+        gmail_pass = ""
+        if gmail_user:
+            gmail_pass = click.prompt("🔑 Gmail App Password", default="", hide_input=True, show_default=False)
+            
+        try:
+            with open(env_path, "w") as f:
+                f.write(f"# Telegram\nTELEGRAM_TOKEN={telegram_token}\nAUTHORIZED_USERS={auth_users}\nNOTIFICATION_CHAT_ID={notif_chat}\n\n")
+                if brave_key:
+                    f.write(f"# Search\nBRAVE_API_KEY={brave_key}\n\n")
+                if gmail_user:
+                    f.write(f"# Email\nGMAIL_USER={gmail_user}\nGMAIL_APP_PASSWORD={gmail_pass}\n")
+                    
+            click.secho("  ✓ Created .env", fg=GREEN)
+        except Exception as e:
+            click.secho(f"  ✗ Failed to create .env: {e}", fg=RED)
+
+    # Reload config now that it exists
     with open(config_path, "r") as f:
         cfg = yaml.safe_load(f) or {}
+
+    # Ensure default data files exist
+    try:
+        # Instructions
+        instr_file = cfg.get("INSTRUCTIONS_FILE", "data/instructions.md")
+        instr_path = os.path.join(CONFIG_DIR, instr_file)
+        # Ensure parent dir exists for instructions (e.g. data/)
+        os.makedirs(os.path.dirname(instr_path), exist_ok=True)
+        
+        if not os.path.exists(instr_path):
+            click.secho(f"  Creating default instructions at {instr_file}...", fg=CYAN)
+            try:
+                # Try to load from "data" package
+                import importlib.resources
+                content = importlib.resources.read_text("data", "instructions.md")
+            except (ImportError, FileNotFoundError):
+                # Fallback if package data not found (e.g. running from source without install)
+                # In dev mode, data/instructions.md is at PROJECT_ROOT/data/instructions.md
+                fallback_path = os.path.join(PROJECT_ROOT, "data", "instructions.md")
+                if os.path.exists(fallback_path):
+                     with open(fallback_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                else:
+                    content = "Eres un asistente útil." # Minimal fallback
+
+            with open(instr_path, "w", encoding="utf-8") as f:
+                f.write(content.strip())
+            click.secho(f"  ✓ Created {instr_file}", fg=GREEN)
+
+        # Events
+        events_file = cfg.get("EVENTS_FILE", "data/events.txt")
+        events_path = os.path.join(CONFIG_DIR, events_file)
+        os.makedirs(os.path.dirname(events_path), exist_ok=True)
+        
+        if not os.path.exists(events_path):
+            with open(events_path, "w", encoding="utf-8") as f:
+                f.write("") # Empty file
+            click.secho(f"  ✓ Created empty {events_file}", fg=GREEN)
+
+        # Memory (optional, but good to have)
+        memory_file = cfg.get("MEMORY_FILE", "data/memory.md")
+        if memory_file:
+            memory_path = os.path.join(CONFIG_DIR, memory_file)
+            os.makedirs(os.path.dirname(memory_path), exist_ok=True)
+            if not os.path.exists(memory_path):
+                with open(memory_path, "w", encoding="utf-8") as f:
+                    f.write("# Memory Store\n")
+                click.secho(f"  ✓ Created {memory_file}", fg=GREEN)
+
+    except Exception as e:
+        click.secho(f"  ⚠ Failed to ensure data files: {e}", fg=YELLOW)
 
     # Collect model names from config
     model_keys = ["MODEL", "VISION_MODEL", "MATH_MODEL", "OCR_MODEL"]
@@ -347,6 +458,7 @@ def setup():
 
     if not models:
         click.secho("No models found in config.yaml", fg=YELLOW)
+        # Continue to setup models even if none found? No, return.
         return
 
     # Check Ollama
@@ -363,6 +475,7 @@ def setup():
         existing = set()
 
     click.secho("=== FemtoBot Setup ===\n", fg=CYAN, bold=True)
+    click.secho(f"Configuration directory: {CONFIG_DIR}", fg=CYAN)
 
     for key, model_name in models:
         if model_name in existing:
@@ -380,6 +493,7 @@ def setup():
 
     click.echo()
     click.secho("✓ Setup complete!", fg=GREEN)
+    click.secho(f"IMPORTANT: Edit {os.path.join(CONFIG_DIR, '.env')} with your Telegram Token!", fg=YELLOW, bold=True)
 
 
 # ─── UPDATE ───────────────────────────────────────────────────────────
@@ -621,9 +735,9 @@ def backup(output):
     import tarfile
     from datetime import datetime
 
-    data_dir = os.path.join(PROJECT_ROOT, "data")
-    config_file = os.path.join(PROJECT_ROOT, "config.yaml")
-    env_file = os.path.join(PROJECT_ROOT, ".env")
+    data_dir = DATA_DIR
+    config_file = os.path.join(CONFIG_DIR, "config.yaml")
+    env_file = os.path.join(CONFIG_DIR, ".env")
 
     if not os.path.exists(data_dir):
         click.secho("✗ data/ directory not found", fg=RED)
@@ -631,7 +745,7 @@ def backup(output):
 
     _ensure_dir()
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_path = output or os.path.join(FEMTOBOT_DIR, f"backup_{timestamp}.tar.gz")
+    backup_path = output or os.path.join(CONFIG_DIR, f"backup_{timestamp}.tar.gz")
 
     click.secho(f"📦 Creating backup...", fg=CYAN)
 
@@ -671,7 +785,7 @@ def restore(backup_file, force):
     click.secho(f"📦 Restoring from {backup_file}...", fg=CYAN)
 
     with tarfile.open(backup_file, "r:gz") as tar:
-        tar.extractall(path=PROJECT_ROOT)
+        tar.extractall(path=CONFIG_DIR)
 
     click.secho("✓ Restore complete!", fg=GREEN)
     click.echo("  Restart FemtoBot to apply changes: femtobot restart")
@@ -696,16 +810,21 @@ def doctor():
         issues += 1
 
     # 2. Venv
-    venv_path = os.path.join(PROJECT_ROOT, "venv_bot")
-    if os.path.exists(venv_path):
-        click.secho("  ✓ venv_bot exists", fg=GREEN)
+    # 2. Venv (Dev mode only)
+    from src.constants import IS_DEV_MODE
+    if IS_DEV_MODE:
+        venv_path = os.path.join(PROJECT_ROOT, "venv_bot")
+        if os.path.exists(venv_path):
+            click.secho("  ✓ venv_bot exists", fg=GREEN)
+        else:
+            click.secho("  ✗ venv_bot not found (run ./run.sh first)", fg=RED)
+            issues += 1
     else:
-        click.secho("  ✗ venv_bot not found (run ./run.sh first)", fg=RED)
-        issues += 1
+        click.secho("  ✓ Running in installed mode", fg=GREEN)
 
     # 3. Config files
     for name in ["config.yaml", ".env"]:
-        path = os.path.join(PROJECT_ROOT, name)
+        path = os.path.join(CONFIG_DIR, name)
         if os.path.exists(path):
             click.secho(f"  ✓ {name} found", fg=GREEN)
         else:
@@ -713,16 +832,15 @@ def doctor():
             issues += 1
 
     # 4. Data directory
-    data_dir = os.path.join(PROJECT_ROOT, "data")
-    if os.path.exists(data_dir) and os.access(data_dir, os.W_OK):
-        click.secho("  ✓ data/ writable", fg=GREEN)
+    if os.path.exists(DATA_DIR) and os.access(DATA_DIR, os.W_OK):
+        click.secho(f"  ✓ data/ writable ({DATA_DIR})", fg=GREEN)
     else:
-        click.secho("  ✗ data/ not writable or missing", fg=RED)
+        click.secho(f"  ✗ data/ not writable or missing ({DATA_DIR})", fg=RED)
         issues += 1
 
     # 5. Environment variables
     from dotenv import load_dotenv
-    load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
+    load_dotenv(os.path.join(CONFIG_DIR, ".env"))
 
     env_checks = {
         "TELEGRAM_TOKEN": "Telegram bot token",
@@ -760,7 +878,7 @@ def doctor():
             r = httpx.get("http://localhost:11434/api/tags", timeout=3)
             existing = {m["name"] for m in r.json().get("models", [])}
 
-            config_path = os.path.join(PROJECT_ROOT, "config.yaml")
+            config_path = os.path.join(CONFIG_DIR, "config.yaml")
             if os.path.exists(config_path):
                 with open(config_path, "r") as f:
                     cfg = yaml.safe_load(f) or {}

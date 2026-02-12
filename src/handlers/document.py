@@ -7,7 +7,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 import logging
 
-from src.constants import PROJECT_ROOT
+from src.constants import CONFIG_DIR, PROJECT_ROOT
 from src.client import OllamaClient
 from src.state.chat_manager import ChatManager
 from src.middleware.rate_limiter import rate_limit
@@ -168,7 +168,7 @@ class DocumentHandler:
                 memory_content = memory_match.group(1).strip()
                 if memory_content:
                     try:
-                        memory_path = os.path.join(PROJECT_ROOT, get_config("MEMORY_FILE"))
+                        memory_path = os.path.join(CONFIG_DIR, get_config("MEMORY_FILE"))
                         with open(memory_path, "a", encoding="utf-8") as f:
                             f.write(f"\n- {memory_content}")
                         # Legacy load memory memory

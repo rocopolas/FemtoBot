@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 from typing import List, Dict, Any, Callable
 
-from src.constants import PROJECT_ROOT
+from src.constants import CONFIG_DIR
 from src.client import OllamaClient
 from utils.cron_utils import CronUtils
 from utils.wiz_utils import control_light
@@ -102,7 +102,7 @@ class TUICommandProcessor:
     
     async def _process_cron_commands(self, response: str):
         """Process cron add/delete commands."""
-        events_file = os.path.join(PROJECT_ROOT, get_config("EVENTS_FILE"))
+        events_file = os.path.join(CONFIG_DIR, get_config("EVENTS_FILE"))
         
         # Delete commands
         for match in self.PATTERNS['cron_delete'].finditer(response):
@@ -151,7 +151,7 @@ class TUICommandProcessor:
     
     async def _process_memory_commands(self, response: str):
         """Process memory add/delete commands."""
-        memory_path = os.path.join(PROJECT_ROOT, get_config("MEMORY_FILE"))
+        memory_path = os.path.join(CONFIG_DIR, get_config("MEMORY_FILE"))
         
         # Delete commands
         for match in self.PATTERNS['memory_delete'].finditer(response):

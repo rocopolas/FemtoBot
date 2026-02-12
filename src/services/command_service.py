@@ -14,11 +14,11 @@ from utils.telegram_utils import escape_code
 logger = logging.getLogger(__name__)
 
 class CommandService:
-    def __init__(self, vector_manager, command_patterns: Dict[str, Pattern], project_root: str):
+    def __init__(self, vector_manager, command_patterns: Dict[str, Pattern], config_dir: str):
         self.vector_manager = vector_manager
         self.patterns = command_patterns
-        self.project_root = project_root
-        self.events_file = os.path.join(project_root, get_config("EVENTS_FILE"))
+        self.config_dir = config_dir
+        self.events_file = os.path.join(config_dir, get_config("EVENTS_FILE"))
 
     async def process_commands(self, response_text: str, chat_id: int, context) -> bool:
         """

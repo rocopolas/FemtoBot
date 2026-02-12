@@ -23,8 +23,8 @@ class TUIHistoryManager:
             history_dir: Directory to store history files (default: data/tui_history/)
         """
         if history_dir is None:
-            from src.constants import PROJECT_ROOT
-            history_dir = os.path.join(PROJECT_ROOT, "data", "tui_history")
+            from src.constants import DATA_DIR
+            history_dir = os.path.join(DATA_DIR, "tui_history")
         
         self.history_dir = history_dir
         os.makedirs(history_dir, exist_ok=True)

@@ -32,7 +32,10 @@ femtobot = "src.cli:cli"
 [tool.setuptools]
 packages = ["src", "src.handlers", "src.jobs", "src.memory", "src.middleware",
             "src.services", "src.state", "src.tui_handlers", "src.tui_utils",
-            "utils"]
+            "utils", "data", "assets"]
 
 [tool.setuptools.package-data]
 "*" = ["*.yaml", "*.md", "*.txt", "*.tcss"]
+data = ["*.md", "*.txt"]
+assets = ["*.tcss"]
+src = ["instructions.md"]
