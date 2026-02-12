@@ -852,7 +852,11 @@ def doctor():
                 ret_code = subprocess.call([tmp_script])
                 
                 if ret_code == 0:
-                    click.secho("  ✓ Python 3.12 installed! You may need to create a new venv.", fg=GREEN)
+                    click.secho("  ✓ Python 3.12 installed & Environment created!", fg=GREEN)
+                    click.secho("  ⚠ To switch to the new version, just run:", fg=YELLOW)
+                    click.secho("    source venv_bot/bin/activate", fg=CYAN)
+                    click.secho("    femtobot setup", fg=CYAN)
+                    return # Exit to force user to switch
                 else:
                     click.secho("  ✗ Installation failed.", fg=RED)
                 
@@ -864,7 +868,6 @@ def doctor():
                 click.secho(f"  ✗ Failed to run installer: {e}", fg=RED)
 
 
-    # 2. Venv
     # 2. Venv (Dev mode only)
     from src.constants import IS_DEV_MODE
     if IS_DEV_MODE:
@@ -875,87 +878,101 @@ def doctor():
             click.secho("  ✗ venv_bot not found (run ./run.sh first)", fg=RED)
             issues += 1
     else:
-        click.secho("  ✓ Running in installed mode", fg=GREEN)
+         if sys.prefix != sys.base_prefix:
+            click.secho("  ✓ Running in venv (pip installed)", fg=GREEN)
+         else:
+            click.secho("  ⚠ Not running in a virtual environment (recommended)", fg=YELLOW)
 
     # 3. Config files
-    for name in ["config.yaml", ".env"]:
-        path = os.path.join(CONFIG_DIR, name)
-        if os.path.exists(path):
-            click.secho(f"  ✓ {name} found", fg=GREEN)
-        else:
-            click.secho(f"  ✗ {name} missing", fg=RED)
-            issues += 1
+    config_path = os.path.join(CONFIG_DIR, "config.yaml")
+    env_path = os.path.join(CONFIG_DIR, ".env")
 
-    # 4. Data directory
-    if os.path.exists(DATA_DIR) and os.access(DATA_DIR, os.W_OK):
-        click.secho(f"  ✓ data/ writable ({DATA_DIR})", fg=GREEN)
+    # 3.1 config.yaml
+    if os.path.exists(config_path):
+        click.secho("  ✓ config.yaml found", fg=GREEN)
+        with open(config_path, "r") as f:
+            cfg = yaml.safe_load(f) or {}
     else:
-        click.secho(f"  ✗ data/ not writable or missing ({DATA_DIR})", fg=RED)
+        click.secho("  ✗ config.yaml missing", fg=RED)
+        issues += 1
+        cfg = {} # Ensure cfg is defined even if file is missing
+
+    # 3.2 .env
+    if os.path.exists(env_path):
+        click.secho("  ✓ .env found", fg=GREEN)
+        
+        # Check specific vars
+        from dotenv import dotenv_values
+        config = dotenv_values(env_path)
+        
+        if config.get("TELEGRAM_TOKEN"):
+             click.secho("  ✓ TELEGRAM_TOKEN set", fg=GREEN)
+        else:
+             click.secho("  ✗ TELEGRAM_TOKEN missing", fg=RED)
+             issues += 1
+             
+        if config.get("AUTHORIZED_USERS"):
+             click.secho("  ✓ AUTHORIZED_USERS set", fg=GREEN)
+        else:
+             click.secho("  ✗ AUTHORIZED_USERS missing", fg=RED)
+             issues += 1
+             
+        # Optional warnings
+        if config.get("BRAVE_API_KEY"): click.secho("  ✓ BRAVE_API_KEY set", fg=GREEN)
+        if config.get("GMAIL_USER"): click.secho("  ✓ GMAIL_USER set", fg=GREEN)
+        if config.get("NOTIFICATION_CHAT_ID"): click.secho("  ✓ NOTIFICATION_CHAT_ID set", fg=GREEN)
+
+    else:
+        click.secho("  ✗ .env missing", fg=RED)
         issues += 1
 
-    # 5. Environment variables
-    from dotenv import load_dotenv
-    load_dotenv(os.path.join(CONFIG_DIR, ".env"))
+    # 4. Data directory
+    data_dir = DATA_DIR
+    if os.path.exists(data_dir) and os.access(data_dir, os.W_OK):
+        click.secho(f"  ✓ data/ writable ({data_dir})", fg=GREEN)
+    else:
+        click.secho(f"  ✗ data/ missing or not writable ({data_dir})", fg=RED)
+        issues += 1
 
-    env_checks = {
-        "TELEGRAM_TOKEN": "Telegram bot token",
-        "AUTHORIZED_USERS": "Authorized user IDs",
-    }
-    optional_env = {
-        "BRAVE_API_KEY": "Brave Search API",
-        "GMAIL_USER": "Gmail integration",
-        "NOTIFICATION_CHAT_ID": "Notification chat",
-    }
-
-    for var, desc in env_checks.items():
-        val = os.getenv(var)
-        if val and val.strip():
-            click.secho(f"  ✓ {var} set", fg=GREEN)
-        else:
-            click.secho(f"  ✗ {var} not set ({desc})", fg=RED)
-            issues += 1
-
-    for var, desc in optional_env.items():
-        val = os.getenv(var)
-        if val and val.strip():
-            click.secho(f"  ✓ {var} set", fg=GREEN)
-        else:
-            click.secho(f"  ⚠ {var} not set ({desc}, optional)", fg=YELLOW)
-
+    # 5. Environment variables (This section is now redundant due to .env check above, removing it)
     # 6. Ollama
-    click.echo()
     if _check_ollama():
-        click.secho("  ✓ Ollama running", fg=GREEN)
-
-        # Check required models
+        click.secho("\n  ✓ Ollama running", fg=GREEN)
+        
+        # Check models
+        models = [
+            ("MODEL", cfg.get("MODEL")),
+            ("VISION_MODEL", cfg.get("VISION_MODEL")),
+            ("MATH_MODEL", cfg.get("MATH_MODEL")),
+            ("OCR_MODEL", cfg.get("RAG", {}).get("OCR_MODEL", "glm-ocr:latest")),
+            ("EMBEDDING", cfg.get("RAG", {}).get("EMBEDDING_MODEL"))
+        ]
+        
+        available_models = []
         try:
             import httpx
-            r = httpx.get("http://localhost:11434/api/tags", timeout=3)
-            existing = {m["name"] for m in r.json().get("models", [])}
-
-            config_path = os.path.join(CONFIG_DIR, "config.yaml")
-            if os.path.exists(config_path):
-                with open(config_path, "r") as f:
-                    cfg = yaml.safe_load(f) or {}
-
-                for key in ["MODEL", "VISION_MODEL", "MATH_MODEL", "OCR_MODEL"]:
-                    model = cfg.get(key)
-                    if model:
-                        if model in existing:
-                            click.secho(f"  ✓ {key}: {model}", fg=GREEN)
-                        else:
-                            click.secho(f"  ✗ {key}: {model} (not downloaded — run 'femtobot setup')", fg=RED)
-                            issues += 1
-
-                embed = cfg.get("RAG", {}).get("EMBEDDING_MODEL")
-                if embed:
-                    if embed in existing:
-                        click.secho(f"  ✓ EMBEDDING: {embed}", fg=GREEN)
-                    else:
-                        click.secho(f"  ✗ EMBEDDING: {embed} (not downloaded)", fg=RED)
-                        issues += 1
-        except Exception:
-            pass
+            resp = httpx.get("http://localhost:11434/api/tags", timeout=2.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                available_models = [m["name"] for m in data.get("models", [])]
+        except:
+             pass
+            
+        for name, model_name in models:
+            if not model_name: continue
+            
+            # Simple check if model string is in available tags
+            found = False
+            for avail in available_models:
+                if model_name in avail:
+                    found = True
+                    break
+            
+            if found:
+                click.secho(f"  ✓ {name}: {model_name} found", fg=GREEN)
+            else:
+                click.secho(f"  ✗ {name}: {model_name} (not downloaded — run 'femtobot setup')", fg=RED)
+                issues += 1
     else:
         click.secho("  ✗ Ollama not running", fg=RED)
         issues += 1

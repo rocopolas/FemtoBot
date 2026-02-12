@@ -44,6 +44,21 @@ fi
 
 if command -v python3.12 &> /dev/null; then
     echo -e "${GREEN}✅ Python 3.12 installed successfully!${NC}"
+    
+    echo -e "${GREEN}📦 Creating virtual environment 'venv_bot'...${NC}"
+    python3.12 -m venv venv_bot
+    
+    if [ -f "venv_bot/bin/pip" ]; then
+        echo -e "${GREEN}⬇ Installing femtobot in new environment...${NC}"
+        ./venv_bot/bin/pip install --upgrade pip --quiet
+        ./venv_bot/bin/pip install femtobot --quiet
+        
+        echo -e "${GREEN}✅ All set!${NC}"
+    else
+        echo -e "${RED}⚠ Failed to create virtual environment.${NC}"
+        exit 1
+    fi
+
     exit 0
 else
     echo -e "${RED}❌ Installation appeared to finish but 'python3.12' command is not found.${NC}"
