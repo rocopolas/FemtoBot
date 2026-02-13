@@ -13,3 +13,4 @@ yt-dlp
 odfpy
 markdown
 psutil>=5.9.0
+trafilatura>=1.12.0

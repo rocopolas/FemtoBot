@@ -1,194 +1,126 @@
 import logging
-import json
-import asyncio
 import os
 import re
-from typing import List, Dict, Optional, Callable, Any
+from typing import Optional, Callable, Any
 from datetime import datetime
 
 from odf.opendocument import OpenDocumentText
-from odf.style import Style, TextProperties, ParagraphProperties
-from odf.text import P, H, List as OdfList, ListItem, Span
+from odf.style import Style, TextProperties
+from odf.text import P, H, Span
 from odf.teletype import addTextToElement
 
 from src.client import OllamaClient
-from utils.search_utils import BraveSearch
 from utils.config_loader import get_config
 from src.constants import DATA_DIR
+from src.services.deep_research.orchestrator import DeepResearchOrchestrator
+from src.services.deep_research.writer import Writer
 
 logger = logging.getLogger(__name__)
 
+
 class DeepResearchService:
-    """Service for performing deep iterative research and generating reports."""
+    """
+    Service for performing deep iterative research and generating reports.
+    
+    Uses a 5-module architecture:
+    1. Planner - Decomposes questions into sub-tasks
+    2. Hunter - Searches for sources
+    3. Reader - Extracts relevant content
+    4. Critic - Evaluates quality and controls loop
+    5. Writer - Synthesizes final report
+    """
     
     def __init__(self):
         self.client = OllamaClient()
         self.model = get_config("MODEL")
+        self.max_iterations = 15  # Maximum research iterations
+        self.search_count = 5     # Sources per search
         
-    async def research(self, topic: str, chat_id: int, status_callback: Optional[Callable[[str], Any]] = None) -> str:
+    async def research(
+        self, 
+        topic: str, 
+        chat_id: int, 
+        status_callback: Optional[Callable[[str], Any]] = None
+    ) -> str:
         """
         Performs deep research on a topic and returns the path to the generated ODT report.
         
         Args:
-            topic: The research topic
+            topic: The research topic/question
             chat_id: The chat ID of the user requesting research
             status_callback: Async function to send status updates to the user
             
         Returns:
             Path to the generated ODT file
         """
-        max_iterations = 5
-        accumulated_knowledge = ""
+        logger.info(f"Starting Deep Research V2 for chat {chat_id}: {topic[:50]}...")
         
-        if status_callback:
-            await status_callback(f"🧠 Starting research on: {topic}")
+        try:
+            # Create orchestrator
+            orchestrator = DeepResearchOrchestrator(
+                llm_client=self.client,
+                model=self.model,
+                max_iterations=self.max_iterations,
+                search_count=self.search_count,
+                status_callback=status_callback
+            )
             
-        for i in range(max_iterations):
-            logger.info(f"Research iteration {i+1}/{max_iterations} for chat {chat_id}")
+            # Execute research workflow
+            context = await orchestrator.execute_research(topic, chat_id)
             
-            # 1. Decide next action
-            action_prompt = self._create_action_prompt(topic, accumulated_knowledge)
-            response_json = await self._get_llm_json_response(action_prompt)
+            # Generate report using Writer module
+            writer = Writer(self.client)
+            report_markdown = await writer.write_report(context, self.model)
             
-            if not response_json:
-                logger.warning("Failed to get valid JSON from LLM. Aborting research loop.")
-                break
-                
-            thought = response_json.get("thought", "No thought provided.")
-            action = response_json.get("action", "finish")
-            query = response_json.get("query", "")
+            # Create ODT file
+            file_path = self._create_odt_report(topic, report_markdown)
             
-            logger.info(f"Iteration {i+1}: Action={action}, Query={query}")
+            # Send completion notification
+            if status_callback:
+                total_chunks = len(context.get_all_completed_chunks())
+                total_sources = len(set(
+                    c.source.url for c in context.get_all_completed_chunks()
+                ))
+                await status_callback(
+                    f"✅ Research complete!\n"
+                    f"📊 {total_chunks} chunks from {total_sources} sources\n"
+                    f"🔄 {context.iteration_count} iterations\n"
+                    f"📝 Generating report..."
+                )
             
-            if action == "finish":
-                if status_callback:
-                    await status_callback("✅ Information gathering complete. Generating report...")
-                break
-                
-            if action == "search" and query:
-                if status_callback:
-                    await status_callback(f"🔍 Searching: {query}...")
-                
-                search_results = await BraveSearch.search(query, count=3)
-                
-                # Summarize findings to avoid context bloat
-                summary = await self._summarize_results(topic, query, search_results)
-                accumulated_knowledge += f"\n\n### Findings from '{query}':\n{summary}"
-            else:
-                logger.warning(f"Invalid action or missing query: {response_json}")
-                break
+            logger.info(f"Deep Research V2 completed for chat {chat_id}")
+            return file_path
+            
+        except Exception as e:
+            logger.error(f"Error in Deep Research V2: {e}", exc_info=True)
+            if status_callback:
+                await status_callback(f"❌ Error during research: {str(e)}")
+            raise
+    
+    def _create_odt_report(self, title: str, markdown_content: str) -> str:
+        """
+        Convert Markdown report to ODT file.
         
-        # 2. Generate Final Report
-        if not accumulated_knowledge:
-            accumulated_knowledge = "No specific information found, but I will write a report based on my internal knowledge."
+        Args:
+            title: Report title/topic
+            markdown_content: Markdown formatted report
             
-        report_markdown = await self._generate_report_markdown(topic, accumulated_knowledge)
-        
-        # 3. Create ODT
+        Returns:
+            Path to generated ODT file
+        """
+        # Generate filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-        # Sanitize topic for filename
-        safe_topic = re.sub(r'[^\w\-]', '_', topic)
-        # Limit length to avoid filesystem issues
-        safe_topic = safe_topic[:50]
-        
-        filename = f"report_{safe_topic}_{timestamp}.odt"
-
-
+        safe_topic = re.sub(r'[^\w\-]', '_', title)[:50]
         filename = f"report_{safe_topic}_{timestamp}.odt"
         file_path = os.path.join(DATA_DIR, filename)
         
         # Ensure data directory exists
         os.makedirs(DATA_DIR, exist_ok=True)
         
-        self._create_odt(topic, report_markdown, file_path)
-        
-        return file_path
-
-    def _create_action_prompt(self, topic: str, knowledge: str) -> str:
-        return f"""You are a Deep Research Agent.
-Topic: {topic}
-
-Accumulated Knowledge:
-{knowledge if knowledge else "(None yet)"}
-
-Decide what to do next.
-- If you need more information, search for it.
-- If you have enough information to write a comprehensive report, finish.
-
-Respond ONLY with a valid JSON object in this format:
-{{
-  "thought": "Reasoning for the decision",
-  "action": "search" or "finish",
-  "query": "The search query (required if action is search)"
-}}
-"""
-
-    async def _get_llm_json_response(self, prompt: str) -> Optional[Dict]:
-        """Get a JSON response from the LLM."""
-        messages = [{"role": "user", "content": prompt}]
-        full_response = ""
-        
-        async for chunk in self.client.stream_chat(self.model, messages):
-            full_response += chunk
-            
-        # Try to clean up the response (remove markdown code blocks if any)
-        full_response = full_response.strip()
-        if full_response.startswith("```json"):
-            full_response = full_response[7:]
-        if full_response.startswith("```"):
-            full_response = full_response[3:]
-        if full_response.endswith("```"):
-            full_response = full_response[:-3]
-        
-        full_response = full_response.strip()
-        
-        try:
-            return json.loads(full_response)
-        except json.JSONDecodeError:
-            logger.error(f"Failed to decode JSON: {full_response}")
-            return None
-
-    async def _summarize_results(self, topic: str, query: str, results: str) -> str:
-        """Summarize raw search results relevant to the topic."""
-        prompt = f"""Topic: {topic}
-Search Query: {query}
-Raw Results:
-{results}
-
-Summarize the key findings from these results that are relevant to the topic. Be concise."""
-        
-        messages = [{"role": "user", "content": prompt}]
-        summary = ""
-        async for chunk in self.client.stream_chat(self.model, messages):
-            summary += chunk
-        return summary
-
-    async def _generate_report_markdown(self, topic: str, knowledge: str) -> str:
-        """Generate the final report in Markdown."""
-        prompt = f"""Write a comprehensive research report on the following topic.
-Topic: {topic}
-
-Use the gathered information below:
-{knowledge}
-
-Format the report in Markdown.
-- Use # for Title
-- Use ## for Sections
-- Use - for bullet points
-- Be professional and detailed.
-"""
-        messages = [{"role": "user", "content": prompt}]
-        report = ""
-        async for chunk in self.client.stream_chat(self.model, messages):
-            report += chunk
-        return report
-
-    def _create_odt(self, title: str, markdown_content: str, file_path: str):
-        """Convert Markdown content to an ODT file."""
+        # Create ODT document
         textdoc = OpenDocumentText()
         
-        # Styles
+        # Define styles
         s_header1 = Style(name="Heading 1", family="paragraph")
         s_header1.addElement(TextProperties(fontsize="24pt", fontweight="bold"))
         textdoc.styles.addElement(s_header1)
@@ -201,12 +133,11 @@ Format the report in Markdown.
         s_text.addElement(TextProperties(fontsize="12pt"))
         textdoc.styles.addElement(s_text)
         
-        # Bold Style
         s_bold = Style(name="Bold", family="text")
         s_bold.addElement(TextProperties(fontweight="bold"))
         textdoc.styles.addElement(s_bold)
         
-        # Process content line by line (simple markdown parser)
+        # Process content
         lines = markdown_content.split('\n')
         
         def add_styled_text(parent_element, text):
@@ -219,35 +150,46 @@ Format the report in Markdown.
                     parent_element.addElement(s)
                 else:
                     addTextToElement(parent_element, part)
-
+        
         for line in lines:
             line = line.strip()
             if not line:
                 continue
                 
             if line.startswith("# "):
-                # Headers are already bold by style, so remove markdown bold markers
+                # H1
                 clean_text = line[2:].replace("**", "").strip()
                 h = H(outlinelevel=1, stylename=s_header1, text=clean_text)
                 textdoc.text.addElement(h)
             elif line.startswith("## "):
+                # H2
                 clean_text = line[3:].replace("**", "").strip()
                 h = H(outlinelevel=2, stylename=s_header2, text=clean_text)
                 textdoc.text.addElement(h)
             elif line.startswith("### "):
-                 clean_text = line[4:].replace("**", "").strip()
-                 h = H(outlinelevel=3, stylename=s_header2, text=clean_text)
-                 textdoc.text.addElement(h)
+                # H3
+                clean_text = line[4:].replace("**", "").strip()
+                h = H(outlinelevel=3, stylename=s_header2, text=clean_text)
+                textdoc.text.addElement(h)
             elif line.startswith("- ") or line.startswith("* "):
-                # List handling with bold support
+                # Bullet list
                 p = P(stylename=s_text)
-                # Add bullet manually as we are using paragraphs for lists (simple approach)
                 addTextToElement(p, "• ")
                 add_styled_text(p, line[2:])
                 textdoc.text.addElement(p)
-            else:
+            elif re.match(r'^\[\d+\]', line):
+                # Citation reference [1], [2], etc.
                 p = P(stylename=s_text)
                 add_styled_text(p, line)
                 textdoc.text.addElement(p)
-                
+            else:
+                # Regular paragraph
+                p = P(stylename=s_text)
+                add_styled_text(p, line)
+                textdoc.text.addElement(p)
+        
+        # Save document
         textdoc.save(file_path)
+        logger.info(f"ODT report saved to: {file_path}")
+        
+        return file_path

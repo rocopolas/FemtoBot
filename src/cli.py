@@ -989,7 +989,6 @@ def doctor():
         if click.confirm("  Would you like to try installing Python 3.12 automatically? (Linux only)", default=True):
             try:
                 import importlib.resources
-                import subprocess
                 import stat
                 
                 # Extract script to temp file

@@ -23,7 +23,8 @@ dependencies = [
     "pywizlight",
     "yt-dlp",
     "odfpy",
-    "markdown"
+    "markdown",
+    "trafilatura>=1.12.0"
 ]
 
 [project.scripts]
