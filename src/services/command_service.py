@@ -100,15 +100,46 @@ class CommandService:
             schedule = f"{min_f} {hour_f} {day_f} {month_f} *"
             
             # Build command automatically from nombre
+            import shlex
+            import sys
+            
+            # Use the current python executable to run the script
+            python_exe = sys.executable
+            script_module = "src.scripts.trigger_notification"
+            
+            # Quote the message to be safe for shell
+            safe_nombre = shlex.quote(nombre)
+            
+            # The command that cron will execute
+            # We use the module execution properly
+            # We must ensure we are in the project root, so we cd there first? 
+            # Or we use absolute path.
+            # Let's assume the cron runs from user home or we provide full path.
+            # Safest is to use the full path to python and project root.
+            
+            # However, simpler if we just assume standard environment or RELATIVE if run from root.
+            # But cron runs from home usually.
+            # Let's use the PROJECT_ROOT we can infer or pass.
+            
+            # Actually, let's just use the absolute path to the project if possible.
+            # CommandService doesn't have PROJECT_ROOT handy unless we pass it.
+            # We can use os.getcwd() if we assume the bot is running from root when adding,
+            # but cron runs later.
+            
+            cwd = os.getcwd()
+            
+            base_command = f'cd {cwd} && {python_exe} -m {script_module} {safe_nombre}'
+            
             if tipo == "unico":
                 from datetime import datetime
                 year = datetime.now().year
+                # Keep the date check for year safety
                 command = (
                     f'[ "$(date +\\%Y)" = "{year}" ] && '
-                    f'notify-send "{nombre}"; echo "{nombre}" >> {self.events_file}'
+                    f'{base_command}'
                 )
             else:
-                command = f'notify-send "{nombre}"; echo "{nombre}" >> {self.events_file}'
+                command = base_command
             
             sched_esc = escape_code(schedule)
             nombre_esc = escape_code(nombre)

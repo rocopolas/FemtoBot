@@ -6,7 +6,7 @@ import logging
 from typing import Optional, Tuple, Union
 
 # Import utils
-from utils.youtube_utils import is_youtube_url, download_youtube_video, download_youtube_audio, get_video_title
+from utils.youtube_utils import is_youtube_url, download_youtube_video, download_youtube_audio, get_video_title_async
 from utils.twitter_utils import is_twitter_url, download_twitter_video
 from utils.audio_utils import transcribe_audio
 
@@ -71,13 +71,16 @@ class MediaService:
         """Transcribe YouTube video. Returns (transcription_text, video_title)"""
         try:
             logger.info(f"Transcribing YouTube video: {url}")
-            video_title = get_video_title(url)
+            video_title = await get_video_title_async(url)
             audio_path = await download_youtube_audio(url)
             
             transcription = await transcribe_audio(audio_path)
             
             if os.path.exists(audio_path):
-                os.unlink(audio_path)
+                # Clean up asynchronously if possible, but os.unlink is fast enough usually. 
+                # For strict async we could use aiofiles.os.remove or to_thread
+                import asyncio
+                await asyncio.to_thread(os.unlink, audio_path)
                 
             return transcription, video_title
         except Exception as e:

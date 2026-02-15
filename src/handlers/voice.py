@@ -69,9 +69,15 @@ class VoiceHandler:
             voice_file = await context.bot.get_file(voice.file_id)
             
             # Save to temp file
-            with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp:
-                await voice_file.download_to_drive(tmp.name)
-                tmp_path = tmp.name
+            # Run blocking tempfile creation in thread
+            def create_temp_file():
+                return tempfile.NamedTemporaryFile(suffix=".ogg", delete=False)
+            
+            tmp = await asyncio.to_thread(create_temp_file)
+            tmp_path = tmp.name
+            tmp.close() # Close file handle locally
+            
+            await voice_file.download_to_drive(tmp_path)
             
             # Transcribe with appropriate model
             if is_external:
@@ -80,8 +86,11 @@ class VoiceHandler:
                 transcription = await transcribe_audio(tmp_path)
             
             # Clean up temp file
-            with suppress(FileNotFoundError, PermissionError, OSError):
-                os.unlink(tmp_path)
+            def cleanup_temp():
+                with suppress(FileNotFoundError, PermissionError, OSError):
+                    os.unlink(tmp_path)
+            
+            await asyncio.to_thread(cleanup_temp)
             
             if is_external:
                 # External: just show transcription, don't process with LLM

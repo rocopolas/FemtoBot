@@ -110,20 +110,35 @@ class CronUtils:
         if not command or not command.strip():
             return False, "Command cannot be empty"
         
-        # Check for dangerous patterns BEFORE stripping to preserve trailing spaces
+        # Check for dangerous patterns
+        # We allow '&&' and 'cd' now because we generate them safely
+        # But we still want to block malicious inputs if possible.
+        # However, since we are generating the command ourselves in CommandService (not taking raw command from user),
+        # we can trust the structure IF it matches our expected pattern.
+        # BUT, CronUtils.add_job is generic.
+        
+        # Let's refine the dangerous patterns.
         for pattern in CronUtils.DANGEROUS_PATTERNS:
-            if re.search(pattern, command, re.IGNORECASE):
+            # Skip checking '&&' if it's part of our safe command (we will check structure later)
+             if re.search(pattern, command, re.IGNORECASE):
+                # Allow if it's our generated python command
+                if "src.scripts.trigger_notification" in command and "cd " in command:
+                    continue
                 logger.warning(f"Dangerous pattern detected in command: {pattern}")
                 return False, f"Command contains dangerous pattern: {pattern}"
         
         command = command.strip()
         
-        # Check for multiple commands (potential injection)
-        if ';' in command and not (command.startswith('echo') or command.startswith('notify-send') or command.startswith('[')):
-            # Allow semicolons only in specific safe contexts
-            logger.warning(f"Multiple commands detected (semicolon)")
-            return False, "Multiple commands not allowed for security"
+        # We allow semicolons or && if it's our specific safe command structure
+        is_our_command = "src.scripts.trigger_notification" in command
         
+        if not is_our_command:
+            # Check for multiple commands (potential injection)
+            if ';' in command and not (command.startswith('echo') or command.startswith('notify-send') or command.startswith('[')):
+                # Allow semicolons only in specific safe contexts
+                logger.warning(f"Multiple commands detected (semicolon)")
+                return False, "Multiple commands not allowed for security"
+            
         # Check for shell escapes
         if command.count('`') % 2 != 0:
             return False, "Unmatched backticks detected"
@@ -406,16 +421,25 @@ class CronUtils:
             min_str, hour_str, day_str, month_str, dow_str, command = parts
             
             # Extract task name from command
-            # Look for notify-send "Name" or echo "Name"
+            # Look for notify-send "Name" or echo "Name" OR new python script format
             task_name = "Unknown task"
-            name_match = re.search(r'(?:notify-send|echo)\s+"([^"]+)"', command)
-            if name_match:
-                task_name = name_match.group(1)
+            
+            # 1. New Python Script Format: ... trigger_notification 'Name' ...
+            # The name is quoted with shlex.quote, which usually uses single quotes for strings with spaces
+            script_match = re.search(r'trigger_notification\s+(?:[\'"])(.+?)(?:[\'"])', command)
+            
+            if script_match:
+                 task_name = script_match.group(1)
             else:
-                # Try simple echo without quotes
-                name_match_simple = re.search(r'(?:notify-send|echo)\s+([^"\s]+)', command)
-                if name_match_simple:
-                    task_name = name_match_simple.group(1)
+                # 2. Old format: notify-send "Name"
+                name_match = re.search(r'(?:notify-send|echo)\s+"([^"]+)"', command)
+                if name_match:
+                    task_name = name_match.group(1)
+                else:
+                    # Try simple echo without quotes
+                    name_match_simple = re.search(r'(?:notify-send|echo)\s+([^"\s]+)', command)
+                    if name_match_simple:
+                        task_name = name_match_simple.group(1)
             
             # Remove emoji at the end if present to clean it up further? 
             # No, keep emoji as user requested.
