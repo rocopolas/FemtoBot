@@ -57,10 +57,11 @@ class MessageProcessor:
         update: Update, 
         context: ContextTypes.DEFAULT_TYPE, 
         user_text: str, 
-        use_reply: bool = False
+        use_reply: bool = True # Kept for compatibility but default True effectively
     ):
         """
         Main entry point for processing a message.
+        Always replies to the user message unless impossible.
         """
         chat_id = update.effective_chat.id
         message_id = update.message.message_id
@@ -104,14 +105,23 @@ class MessageProcessor:
         await context.bot.send_chat_action(chat_id=chat_id, action="typing")
         
         if not placeholder_msg: 
-             # We might have one from media handling? 
-             # If not, create one.
-             if use_reply:
-                 placeholder_msg = await context.bot.send_message(
-                     chat_id=chat_id, text="🧠 RAG...", reply_to_message_id=message_id
-                 )
-             else:
-                 placeholder_msg = await update.message.reply_text("🧠 RAG...")
+             # Only reply to the message if use_reply is True (queue backlog)
+             # Otherwise behave like normal (no quote)
+             try:
+                if use_reply:
+                    placeholder_msg = await context.bot.send_message(
+                         chat_id=chat_id, 
+                         text="🧠 RAG...", 
+                         reply_to_message_id=message_id
+                    )
+                else:
+                    placeholder_msg = await context.bot.send_message(
+                         chat_id=chat_id, 
+                         text="🧠 RAG..."
+                    )
+             except Exception:
+                # Fallback
+                placeholder_msg = await context.bot.send_message(chat_id=chat_id, text="🧠 RAG...")
 
         # Prepare RAG context
         current_time = datetime.now().strftime("%H:%M del %d/%m/%Y")
@@ -144,12 +154,16 @@ class MessageProcessor:
             # Clean text (remove internal commands tokens like :::search...:::)
             cleaned_text = format_bot_response(full_response)
             
+            # Determine if we should force reply in final message as well
+            final_reply_id = message_id if use_reply else None
+
             if not cleaned_text:
                 # If only commands were executed and no text remains
                 await placeholder_msg.delete()
             else:
                 chunks = await telegramify_content(cleaned_text)
-                await send_telegramify_results(context, chat_id, chunks, placeholder_msg)
+                # Pass reply_to_message_id only if use_reply is True
+                await send_telegramify_results(context, chat_id, chunks, placeholder_msg, reply_to_message_id=final_reply_id)
             
             await self.chat_manager.append_message(chat_id, {"role": "assistant", "content": full_response})
             
@@ -158,7 +172,12 @@ class MessageProcessor:
             
             if not cleaned_text and commands_processed:
                 try:
-                     await context.bot.send_message(chat_id, "✅ Commands executed successfully.")
+                     # Send confirmation
+                     await context.bot.send_message(
+                         chat_id, 
+                         "✅ Commands executed successfully.", 
+                         reply_to_message_id=final_reply_id
+                     )
                 except Exception:
                      pass
 

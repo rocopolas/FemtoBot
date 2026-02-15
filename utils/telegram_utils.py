@@ -35,7 +35,7 @@ def escape_code(text: str) -> str:
     return re.sub(r'([`\\])', lambda m: '\\' + m.group(1), text)
 
 
-async def send_telegramify_results(context, chat_id, results, placeholder_msg=None):
+async def send_telegramify_results(context, chat_id, results, placeholder_msg=None, reply_to_message_id=None):
     """
     Sends telegramify_markdown v1.0.0+ results handling different content types.
     Uses entities instead of parse_mode.
@@ -45,6 +45,7 @@ async def send_telegramify_results(context, chat_id, results, placeholder_msg=No
         chat_id: Chat ID
         results: List of telegramify objects (Text, File, Photo)
         placeholder_msg: Optional placeholder message to edit
+        reply_to_message_id: Optional message ID to reply to (if sending new messages)
     
     Returns:
         List of sent messages
@@ -64,7 +65,7 @@ async def send_telegramify_results(context, chat_id, results, placeholder_msg=No
                     sent_messages.append(placeholder_msg)
                     first_item_sent = True
                 else:
-                    msg = await context.bot.send_message(chat_id, item)
+                    msg = await context.bot.send_message(chat_id, item, reply_to_message_id=reply_to_message_id)
                     sent_messages.append(msg)
                 continue
             
@@ -81,7 +82,8 @@ async def send_telegramify_results(context, chat_id, results, placeholder_msg=No
                     msg = await context.bot.send_message(
                         chat_id, 
                         item.text,
-                        entities=entities
+                        entities=entities,
+                        reply_to_message_id=reply_to_message_id
                     )
                     sent_messages.append(msg)
                     
@@ -102,7 +104,8 @@ async def send_telegramify_results(context, chat_id, results, placeholder_msg=No
                         chat_id,
                         photo=photo_file,
                         caption=caption,
-                        caption_entities=caption_entities
+                        caption_entities=caption_entities,
+                        reply_to_message_id=reply_to_message_id
                     )
                     sent_messages.append(msg)
                     first_item_sent = True
@@ -111,7 +114,8 @@ async def send_telegramify_results(context, chat_id, results, placeholder_msg=No
                         chat_id,
                         photo=photo_file,
                         caption=caption,
-                        caption_entities=caption_entities
+                        caption_entities=caption_entities,
+                        reply_to_message_id=reply_to_message_id
                     )
                     sent_messages.append(msg)
                     
@@ -141,7 +145,8 @@ async def send_telegramify_results(context, chat_id, results, placeholder_msg=No
                             msg = await context.bot.send_message(
                                 chat_id,
                                 formatted_text,
-                                parse_mode="Markdown"
+                                parse_mode="Markdown",
+                                reply_to_message_id=reply_to_message_id
                             )
                             sent_messages.append(msg)
                         continue # Skip sending as file
@@ -165,7 +170,8 @@ async def send_telegramify_results(context, chat_id, results, placeholder_msg=No
                         chat_id,
                         document=doc_file,
                         caption=caption,
-                        caption_entities=caption_entities
+                        caption_entities=caption_entities,
+                        reply_to_message_id=reply_to_message_id
                     )
                     sent_messages.append(msg)
                     first_item_sent = True
@@ -174,7 +180,8 @@ async def send_telegramify_results(context, chat_id, results, placeholder_msg=No
                         chat_id,
                         document=doc_file,
                         caption=caption,
-                        caption_entities=caption_entities
+                        caption_entities=caption_entities,
+                        reply_to_message_id=reply_to_message_id
                     )
                     sent_messages.append(msg)
                     
@@ -182,10 +189,10 @@ async def send_telegramify_results(context, chat_id, results, placeholder_msg=No
             logger.error(f"Error sending telegramify item: {e}", exc_info=True)
             # Fallback: try to send as plain text
             if hasattr(item, 'text'):
-                msg = await context.bot.send_message(chat_id, item.text)
+                msg = await context.bot.send_message(chat_id, item.text, reply_to_message_id=reply_to_message_id)
                 sent_messages.append(msg)
             elif hasattr(item, 'content'):
-                msg = await context.bot.send_message(chat_id, item.content)
+                msg = await context.bot.send_message(chat_id, item.content, reply_to_message_id=reply_to_message_id)
                 sent_messages.append(msg)
     
     return sent_messages

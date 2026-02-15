@@ -37,7 +37,10 @@ class VectorManager:
         persist_path = os.path.join(DATA_DIR, "chroma_db")
         os.makedirs(persist_path, exist_ok=True)
         
-        self.chroma = chromadb.PersistentClient(path=persist_path)
+        self.chroma = chromadb.PersistentClient(
+            path=persist_path,
+            settings=Settings(anonymized_telemetry=False, allow_reset=True)
+        )
         
         # Collections
         self.documents_collection = self.chroma.get_or_create_collection(

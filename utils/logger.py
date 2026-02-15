@@ -92,9 +92,8 @@ def setup_logging(token=None):
     logging.getLogger("telegram").setLevel(logging.INFO)
     logging.getLogger("apscheduler").setLevel(logging.WARNING)
     
-    # Add token redaction filter to sensitive loggers
+    # Add token redaction filter to the handler so it applies to ALL logs
     token_filter = TokenRedactFilter(token)
-    for logger_name in ['httpx', 'httpcore', 'telegram', 'root']:
-        logging.getLogger(logger_name).addFilter(token_filter)
+    console_handler.addFilter(token_filter)
         
     return logging.getLogger("FemtoBot")
