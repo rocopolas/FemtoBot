@@ -288,7 +288,12 @@ def format_bot_response(response: str) -> str:
     
     # LaTeX math is now handled automatically by telegramify-markdown
     
-    return formatted.strip()
+    # Strip wrapping quotes the LLM sometimes adds
+    formatted = formatted.strip()
+    if len(formatted) >= 2 and formatted.startswith('"') and formatted.endswith('"'):
+        formatted = formatted[1:-1].strip()
+    
+    return formatted
 
 
 def prune_history(history: list, limit: int = 30000) -> list:

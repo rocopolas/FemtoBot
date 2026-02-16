@@ -100,7 +100,8 @@ async def turn_on_light(ip: str, brightness: int = 100, color: str = None) -> bo
         
         return True
     except Exception as e:
-        logger.error(f"[WIZ] Error turning on {ip}: {e}")
+        error_msg = str(e) or repr(e)
+        logger.error(f"[WIZ] Error turning on {ip}: {error_msg}")
         return False
 
 async def turn_off_light(ip: str) -> bool:
@@ -114,7 +115,8 @@ async def turn_off_light(ip: str) -> bool:
         await light.turn_off()
         return True
     except Exception as e:
-        logger.error(f"[WIZ] Error turning off {ip}: {e}")
+        error_msg = str(e) or repr(e)
+        logger.error(f"[WIZ] Error turning off {ip}: {error_msg}")
         return False
 
 async def control_light(name: str, action: str, value: str = None) -> str:
