@@ -158,7 +158,7 @@ class FemtoBotApp(App):
         
         # Show welcome message
         self._output_message(
-            "🤖 FemtoBot TUI started\n"
+            "🐰 FemtoBot TUI started\n"
             "Type /help to see available commands",
             "info"
         )

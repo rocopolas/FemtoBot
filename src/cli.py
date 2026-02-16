@@ -157,7 +157,7 @@ def _check_ollama():
 @click.group()
 @click.version_option(version="1.0.0", prog_name="FemtoBot")
 def cli():
-    """🤖 FemtoBot - Smart personal assistant for local LLMs.
+    """ 🐰 FemtoBot - Smart personal assistant for local LLMs.
 
     Manage your FemtoBot instance from the command line.
     """
@@ -539,7 +539,7 @@ def setup():
         click.secho(f"⚠ .env not found at {env_path}", fg=YELLOW)
         click.secho("  Configuration required:", fg=CYAN)
         
-        telegram_token = click.prompt("🤖 Telegram Bot Token", type=str)
+        telegram_token = click.prompt("🐰 Telegram Bot Token", type=str)
         auth_users = click.prompt("👥 Authorized Users (comma-separated IDs)", type=str)
         notif_chat = click.prompt("📢 Notification Chat ID", default=auth_users.split(',')[0].strip(), show_default=True)
         
@@ -874,7 +874,7 @@ def wizard():
     while True:
         click.echo()
         click.secho("=== FemtoBot Wizard ===\n", fg=CYAN, bold=True)
-        click.echo("  1. 🤖 Edit Models")
+        click.echo("  1. 🐰 Edit Models")
         click.echo("  2. ⚡ Toggle Features")
         click.echo("  3. 📱 Edit Telegram Settings")
         click.echo("  4. 🔌 Edit Integrations (Brave, Gmail)")
