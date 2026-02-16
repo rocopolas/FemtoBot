@@ -225,13 +225,19 @@ If you prefer to configure the environment yourself:
 
 ---
 
-### 📦 Option 3: Installing from a release (Not Recommended)
+### 🐳 Option 3: Docker
 
-If you just want to install the package without cloning the repo:
+Run FemtoBot and Ollama together using Docker Compose:
 
 ```bash
-pip install https://github.com/rocopolas/FemtoBot/releases/download/v1.1.6/femtobot-1.0.0-py3-none-any.whl
+git clone https://github.com/rocopolas/FemtoBot.git
+cd FemtoBot
+cp .env.example .env
+# Edit .env with your tokens
+docker compose up -d
 ```
+
+> **Note:** GPU passthrough is configured for NVIDIA GPUs. Edit `docker-compose.yml` if you use a different GPU or CPU-only.
 
 ---
 
@@ -245,9 +251,11 @@ femtobot setup
 ```
 
 This interactive command will:
-1.  **Configure Environment**: Prompt you for your Telegram Token, Authorized Users, and other settings to create your `.env` file automatically.
-2.  **Download Models**: Automatically pull the necessary Ollama models (Chat, Vision, Embeddings) defined in `config.yaml`.
-3.  **Create Data Files**: Initialize default instructions and memory files.
+1.  **Configure Environment**: Prompt you for your Telegram Token, Authorized Users, and other settings to create your `.env` file.
+2.  **Select Features**: Choose which optional features to enable (lights, email, YouTube, etc.).
+3.  **Auto-detect Language**: Detect your system locale and set Whisper language automatically.
+4.  **Download Models**: Pull the necessary Ollama models defined in `config.yaml`.
+5.  **Create Data Files**: Initialize default instructions and memory files.
 
 *Note: Ensure [Ollama](https://ollama.com/) is running (`ollama serve`) before running setup.*
 
@@ -267,6 +275,20 @@ This will check for:
 
 ---
 
+### 🧙 Configuration Wizard
+
+For a more visual and interactive way to manage your settings after the initial setup, use the built-in wizard:
+
+```bash
+femtobot wizard
+```
+
+This tool provides a terminal-based menu system to:
+- **Toggle Features**: Enable or disable specific utility services (WIZ, Gmail, etc.).
+- **Update Credentials**: Securely update API keys and tokens.
+- **Model Selection**: Switch between different Ollama models for chat and vision.
+
+
 ### 🖥️ CLI Commands
 
 Once installed, you can manage FemtoBot using the CLI:
@@ -281,7 +303,8 @@ femtobot logs -f    # View real-time logs
 # Tools
 femtobot tui        # Open the Terminal User Interface
 femtobot config     # View current configuration
-femtobot setup      # Auto-pull models from config.yaml
+femtobot setup      # Guided setup (features, models, tokens)
+femtobot wizard     # Interactive configurator (edit config via menus)
 femtobot doctor     # Diagnose issues
 femtobot update     # Pull setup updates
 ```
@@ -304,17 +327,26 @@ GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
 MODEL: "llama3.1:latest"
 VISION_MODEL: "qwen3-vl:2b"
 CONTEXT_LIMIT: 200000
-WHISPER_LANGUAGE: "es"
+WHISPER_LANGUAGE: "en"
 WHISPER_MODEL_VOICE: "base"
 WHISPER_MODEL_EXTERNAL: "medium"
 INACTIVITY_TIMEOUT_MINUTES: 5
 
 # RAG / Memory Configuration
 RAG:
-  EMBEDDING_MODEL: "nomic-embed-text" # Must match ollama pull
+  EMBEDDING_MODEL: "nomic-embed-text"
   CHUNK_SIZE: 1000
-  SIMILARITY_THRESHOLD: 0.4 # Lower = looser matching
+  SIMILARITY_THRESHOLD: 0.4
   MAX_RESULTS: 3
+
+# Optional features (set to false to disable)
+FEATURES:
+  WIZ_LIGHTS: true
+  EMAIL_DIGEST: true
+  MATH_SOLVER: true
+  DEEP_RESEARCH: true
+  YOUTUBE: true
+  TWITTER: true
 ```
 
 ## 🎮 Usage

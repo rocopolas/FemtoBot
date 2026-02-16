@@ -38,6 +38,14 @@ DEFAULT_CONFIG = {
         "CHUNK_OVERLAP": 200,
         "SIMILARITY_THRESHOLD": 0.4,
         "MAX_RESULTS": 3
+    },
+    "FEATURES": {
+        "WIZ_LIGHTS": True,
+        "EMAIL_DIGEST": True,
+        "MATH_SOLVER": True,
+        "DEEP_RESEARCH": True,
+        "YOUTUBE": True,
+        "TWITTER": True
     }
 }
 
@@ -187,3 +195,19 @@ def get_all_config() -> Dict[str, Any]:
     if _config is None:
         load_config()
     return _config.copy()
+
+
+def is_feature_enabled(feature_name: str) -> bool:
+    """
+    Check if an optional feature is enabled in config.
+    
+    Args:
+        feature_name: Feature key (e.g. 'WIZ_LIGHTS', 'EMAIL_DIGEST')
+        
+    Returns:
+        True if the feature is enabled (default: True if not specified)
+    """
+    features = get_config("FEATURES", {})
+    if not isinstance(features, dict):
+        return True
+    return features.get(feature_name, True)

@@ -13,3 +13,4 @@ femtobot.log
 femtobot.pid
 .bot.pid
 *.pid
+.gemini/

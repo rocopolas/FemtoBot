@@ -26,7 +26,7 @@ from src.services.command_service import CommandService
 from src.services.upload_service import UploadService
 
 from utils.cron_utils import CronUtils
-from utils.config_loader import get_config
+from utils.config_loader import get_config, is_feature_enabled
 from utils.telegram_utils import split_message, format_bot_response, prune_history, telegramify_content, send_telegramify_results
 from utils.search_utils import BraveSearch
 
@@ -328,7 +328,7 @@ class MessageProcessor:
         """
         
         # 1. Math Command
-        if self.command_patterns['matematicas'].search(full_response):
+        if is_feature_enabled("MATH_SOLVER") and self.command_patterns['matematicas'].search(full_response):
             await placeholder_msg.edit_text("🧮 Solving math...")
             math_model = get_config("MATH_MODEL")
             logger.info(f"Math command detected, querying {math_model}")

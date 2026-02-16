@@ -1,16 +1,23 @@
-click>=8.0
-python-telegram-bot==22.6
-httpx==0.28.1
-python-dotenv==1.2.1
-PyYAML==6.0.3
-faster-whisper==1.2.1
-chromadb>=0.4.0
+# Core dependencies
+click
+python-telegram-bot[job-queue]
+httpx
+python-dotenv
+PyYAML
+faster-whisper
+chromadb
 telegramify-markdown
 pymupdf
 python-docx
-pywizlight
-yt-dlp
-odfpy
 markdown
 psutil>=5.9.0
-trafilatura>=1.12.0
+trafilatura
+
+# Optional: WIZ smart lights
+pywizlight
+
+# Optional: YouTube/Twitter media
+yt-dlp
+
+# Optional: Deep research (ODT export)
+odfpy

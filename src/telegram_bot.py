@@ -45,7 +45,7 @@ from src.services.media_service import MediaService
 from src.services.command_service import CommandService
 from src.services.message_processor import MessageProcessor
 
-from utils.config_loader import get_config, get_all_config
+from utils.config_loader import get_config, get_all_config, is_feature_enabled
 from utils.logger import setup_logging
 
 # Load environment variables
@@ -73,8 +73,8 @@ last_activity = datetime.now()
 rag_service = RagService(vector_manager)
 media_service = MediaService()
 
-# Initialize email digest job
-email_digest_job = EmailDigestJob(notification_chat_id=NOTIFICATION_CHAT_ID)
+# Initialize email digest job (only if feature enabled)
+email_digest_job = EmailDigestJob(notification_chat_id=NOTIFICATION_CHAT_ID) if is_feature_enabled("EMAIL_DIGEST") else None
 
 # Config values
 MODEL = get_config("MODEL")
@@ -295,8 +295,36 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
         except Exception:
             pass
 
+def _validate_startup():
+    """Pre-flight checks before starting the bot."""
+    errors = []
+    
+    if not TOKEN or TOKEN == "your_telegram_token_here":
+        errors.append("TELEGRAM_TOKEN is not set or is still the placeholder value")
+    
+    if not AUTHORIZED_USERS:
+        errors.append("AUTHORIZED_USERS is empty — no one will be able to use the bot")
+    
+    # Check Ollama connectivity
+    try:
+        import httpx
+        r = httpx.get("http://localhost:11434/api/tags", timeout=3)
+        if r.status_code != 200:
+            errors.append("Ollama returned non-200 status")
+    except Exception:
+        errors.append("Ollama is not reachable at localhost:11434 — run 'ollama serve'")
+    
+    if errors:
+        print("\n❌ FemtoBot startup failed:\n")
+        for err in errors:
+            print(f"  • {err}")
+        print("\n💡 Run 'femtobot doctor' for a full diagnostic.\n")
+        sys.exit(1)
+
+
 def main():
     """Main entry point."""
+    _validate_startup()
     kill_existing_bot()
     write_pid()
     load_instructions()
@@ -311,8 +339,10 @@ def main():
     application.add_handler(CommandHandler("unload", command_handlers.unload_models))
     application.add_handler(CommandHandler("restart", command_handlers.restart_bot))
     application.add_handler(CommandHandler("stop", command_handlers.stop_bot))
-    application.add_handler(CommandHandler("digest", command_handlers.email_digest))
-    application.add_handler(CommandHandler("deep", command_handlers.deep_research))
+    if is_feature_enabled("EMAIL_DIGEST") and email_digest_job:
+        application.add_handler(CommandHandler("digest", command_handlers.email_digest))
+    if is_feature_enabled("DEEP_RESEARCH"):
+        application.add_handler(CommandHandler("deep", command_handlers.deep_research))
     
     # Message handlers
     application.add_handler(MessageHandler(filters.VOICE, voice_handler.handle))
@@ -354,7 +384,7 @@ def main():
         name=cleanup_job.name
     )
     
-    if NOTIFICATION_CHAT_ID:
+    if NOTIFICATION_CHAT_ID and is_feature_enabled("EMAIL_DIGEST") and email_digest_job:
         application.job_queue.run_repeating(
             email_digest_job.run,
             interval=email_digest_job.interval_seconds,

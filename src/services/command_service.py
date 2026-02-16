@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Pattern
 
 from utils.cron_utils import CronUtils
 from utils.wiz_utils import control_light
-from utils.config_loader import get_config
+from utils.config_loader import get_config, is_feature_enabled
 from utils.telegram_utils import escape_code
 
 logger = logging.getLogger(__name__)
@@ -44,8 +44,9 @@ class CommandService:
             commands_processed = True
             
         # 5. Light Control
-        if await self._handle_light_control(response_text, chat_id, context):
-            commands_processed = True
+        if is_feature_enabled("WIZ_LIGHTS"):
+            if await self._handle_light_control(response_text, chat_id, context):
+                commands_processed = True
             
         return commands_processed
 

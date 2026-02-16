@@ -561,6 +561,78 @@ def setup():
             click.secho("  ✓ Created .env", fg=GREEN)
         except Exception as e:
             click.secho(f"  ✗ Failed to create .env: {e}", fg=RED)
+    else:
+        click.secho("✓ .env found", fg=GREEN)
+
+    # --- Feature Selection ---
+    click.echo("\n--- Optional Features ---")
+    click.secho("  Enable or disable optional features (press Enter for default):\n", fg=CYAN)
+    
+    features = {}
+    feature_prompts = [
+        ("WIZ_LIGHTS", "💡 WIZ Smart Lights control", False),
+        ("EMAIL_DIGEST", "📧 Daily email digest (requires Gmail)", False),
+        ("MATH_SOLVER", "🧮 Math solver (requires extra model)", True),
+        ("DEEP_RESEARCH", "🧠 Deep research mode", True),
+        ("YOUTUBE", "🎥 YouTube summaries & downloads", True),
+        ("TWITTER", "🐦 Twitter/X media downloads", True),
+    ]
+    
+    for key, label, default in feature_prompts:
+        features[key] = click.confirm(f"  {label}?", default=default)
+    
+    # WIZ Lights configuration
+    wiz_lights = {}
+    if features.get("WIZ_LIGHTS"):
+        click.echo("\n--- WIZ Light Configuration ---")
+        click.secho("  Add your WIZ light bulbs (name + IP address).\n", fg=CYAN)
+        while True:
+            name = click.prompt("  Light name (or 'done' to finish)", default="done", show_default=True)
+            if name.lower() == "done":
+                break
+            ip = click.prompt(f"  IP address for '{name}'")
+            wiz_lights[name] = ip
+            click.secho(f"  ✓ Added {name} → {ip}", fg=GREEN)
+    
+    # --- Auto-detect Language ---
+    detected_lang = "en"
+    try:
+        import locale
+        system_locale = locale.getdefaultlocale()[0] or ""
+        locale_map = {
+            "es": "es", "en": "en", "pt": "pt", "fr": "fr", "de": "de",
+            "it": "it", "ja": "ja", "ko": "ko", "zh": "zh", "ru": "ru",
+            "ar": "ar", "nl": "nl", "pl": "pl", "tr": "tr", "sv": "sv",
+        }
+        lang_prefix = system_locale.split("_")[0].lower() if system_locale else ""
+        detected_lang = locale_map.get(lang_prefix, "en")
+    except Exception:
+        pass
+    
+    whisper_lang = click.prompt(
+        f"\n🌐 Whisper language (auto-detected: {detected_lang})",
+        default=detected_lang, show_default=True
+    )
+
+    # --- Write features + language to config.yaml ---
+    try:
+        with open(config_path, "r") as f:
+            cfg_content = yaml.safe_load(f) or {}
+        
+        cfg_content["FEATURES"] = features
+        cfg_content["WHISPER_LANGUAGE"] = whisper_lang
+        
+        if wiz_lights:
+            cfg_content["WIZ_LIGHTS"] = wiz_lights
+        elif not features.get("WIZ_LIGHTS"):
+            cfg_content.pop("WIZ_LIGHTS", None)
+        
+        with open(config_path, "w") as f:
+            yaml.dump(cfg_content, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        
+        click.secho("\n  ✓ Features and language saved to config.yaml", fg=GREEN)
+    except Exception as e:
+        click.secho(f"  ⚠ Failed to save features: {e}", fg=YELLOW)
 
     # Reload config now that it exists
     with open(config_path, "r") as f:
@@ -571,24 +643,20 @@ def setup():
         # Instructions
         instr_file = cfg.get("INSTRUCTIONS_FILE", "data/instructions.md")
         instr_path = os.path.join(CONFIG_DIR, instr_file)
-        # Ensure parent dir exists for instructions (e.g. data/)
         os.makedirs(os.path.dirname(instr_path), exist_ok=True)
         
         if not os.path.exists(instr_path):
             click.secho(f"  Creating default instructions at {instr_file}...", fg=CYAN)
             try:
-                # Try to load from "data" package
                 import importlib.resources
                 content = importlib.resources.read_text("data", "instructions.md")
             except (ImportError, FileNotFoundError):
-                # Fallback if package data not found (e.g. running from source without install)
-                # In dev mode, data/instructions.md is at PROJECT_ROOT/data/instructions.md
                 fallback_path = os.path.join(PROJECT_ROOT, "data", "instructions.md")
                 if os.path.exists(fallback_path):
                      with open(fallback_path, "r", encoding="utf-8") as f:
                         content = f.read()
                 else:
-                    content = "Eres un asistente útil." # Minimal fallback
+                    content = "You are a helpful assistant."
 
             with open(instr_path, "w", encoding="utf-8") as f:
                 f.write(content.strip())
@@ -601,10 +669,10 @@ def setup():
         
         if not os.path.exists(events_path):
             with open(events_path, "w", encoding="utf-8") as f:
-                f.write("") # Empty file
+                f.write("")
             click.secho(f"  ✓ Created empty {events_file}", fg=GREEN)
 
-        # Memory (optional, but good to have)
+        # Memory
         memory_file = cfg.get("MEMORY_FILE", "data/memory.md")
         if memory_file:
             memory_path = os.path.join(CONFIG_DIR, memory_file)
@@ -633,7 +701,6 @@ def setup():
 
     if not models:
         click.secho("No models found in config.yaml", fg=YELLOW)
-        # Continue to setup models even if none found? No, return.
         return
 
     # Check Ollama
@@ -650,8 +717,7 @@ def setup():
     except Exception:
         existing = set()
 
-    click.secho("=== FemtoBot Setup ===\n", fg=CYAN, bold=True)
-    click.secho(f"Configuration directory: {CONFIG_DIR}", fg=CYAN)
+    click.secho("\n=== Downloading Models ===\n", fg=CYAN, bold=True)
 
     for key, model_name in models:
         if model_name in existing:
@@ -668,8 +734,7 @@ def setup():
                 click.secho(f"  ✗ Failed to pull {model_name}", fg=RED)
 
     click.echo()
-    click.secho("✓ Setup complete!", fg=GREEN)
-    click.secho(f"IMPORTANT: Edit {os.path.join(CONFIG_DIR, '.env')} with your Telegram Token!", fg=YELLOW, bold=True)
+    click.secho("✓ Setup complete! Run 'femtobot start' to launch the bot.", fg=GREEN, bold=True)
 
 
 # ─── UPDATE ───────────────────────────────────────────────────────────
@@ -781,6 +846,266 @@ def update():
 
     click.echo()
     click.secho("✓ Update complete!", fg=GREEN)
+
+
+# ─── WIZARD ──────────────────────────────────────────────────────────
+
+@cli.command()
+def wizard():
+    """Interactive configurator for FemtoBot (edit config without touching files)."""
+    import yaml
+    from dotenv import dotenv_values
+
+    config_path = os.path.join(CONFIG_DIR, "config.yaml")
+    env_path = os.path.join(CONFIG_DIR, ".env")
+
+    # Load current config
+    if os.path.exists(config_path):
+        with open(config_path, "r") as f:
+            cfg = yaml.safe_load(f) or {}
+    else:
+        cfg = {}
+
+    # Load current .env
+    env_vars = dotenv_values(env_path) if os.path.exists(env_path) else {}
+
+    modified = False
+
+    while True:
+        click.echo()
+        click.secho("=== FemtoBot Wizard ===\n", fg=CYAN, bold=True)
+        click.echo("  1. 🤖 Edit Models")
+        click.echo("  2. ⚡ Toggle Features")
+        click.echo("  3. 📱 Edit Telegram Settings")
+        click.echo("  4. 🔌 Edit Integrations (Brave, Gmail)")
+        click.echo("  5. 💡 Edit WIZ Lights")
+        click.echo("  6. 🧪 Test Services")
+        click.echo("  7. 💾 Save & Exit")
+        click.echo("  8. ❌ Exit without saving")
+        click.echo()
+
+        choice = click.prompt("Choose an option", type=int, default=7)
+
+        if choice == 1:
+            # Edit Models
+            click.secho("\n--- Edit Models ---\n", fg=CYAN)
+
+            # Try to list available Ollama models
+            available = []
+            if _check_ollama():
+                try:
+                    import httpx
+                    r = httpx.get("http://localhost:11434/api/tags", timeout=3)
+                    available = [m["name"] for m in r.json().get("models", [])]
+                    if available:
+                        click.secho("  Available Ollama models:", fg=GREEN)
+                        for m in available:
+                            click.echo(f"    • {m}")
+                        click.echo()
+                except Exception:
+                    pass
+
+            model_keys = [
+                ("MODEL", "Chat model", cfg.get("MODEL", "qwen3:8b")),
+                ("VISION_MODEL", "Vision model", cfg.get("VISION_MODEL", "qwen3-vl:2b")),
+                ("MATH_MODEL", "Math model", cfg.get("MATH_MODEL", "qwen2-math:7b")),
+                ("OCR_MODEL", "OCR model", cfg.get("OCR_MODEL", "glm-ocr:latest")),
+            ]
+
+            for key, label, current in model_keys:
+                new_val = click.prompt(f"  {label}", default=current, show_default=True)
+                if new_val != current:
+                    cfg[key] = new_val
+                    modified = True
+
+            # RAG embedding model
+            rag = cfg.get("RAG", {})
+            embed = click.prompt("  Embedding model", default=rag.get("EMBEDDING_MODEL", "qwen3-embedding:0.6b"), show_default=True)
+            if embed != rag.get("EMBEDDING_MODEL"):
+                rag["EMBEDDING_MODEL"] = embed
+                cfg["RAG"] = rag
+                modified = True
+
+        elif choice == 2:
+            # Toggle Features
+            click.secho("\n--- Toggle Features ---\n", fg=CYAN)
+            features = cfg.get("FEATURES", {})
+
+            feature_labels = {
+                "WIZ_LIGHTS": "💡 WIZ Smart Lights",
+                "EMAIL_DIGEST": "📧 Email Digest",
+                "MATH_SOLVER": "🧮 Math Solver",
+                "DEEP_RESEARCH": "🧠 Deep Research",
+                "YOUTUBE": "🎥 YouTube",
+                "TWITTER": "🐦 Twitter/X",
+            }
+
+            for key, label in feature_labels.items():
+                current = features.get(key, True)
+                status = click.style("ON", fg=GREEN) if current else click.style("OFF", fg=RED)
+                new_val = click.confirm(f"  {label} [{status}]", default=current)
+                if new_val != current:
+                    features[key] = new_val
+                    modified = True
+
+            cfg["FEATURES"] = features
+
+        elif choice == 3:
+            # Edit Telegram Settings
+            click.secho("\n--- Telegram Settings ---\n", fg=CYAN)
+
+            token = click.prompt("  Bot Token", default=env_vars.get("TELEGRAM_TOKEN", ""), show_default=False)
+            users = click.prompt("  Authorized Users (comma-separated)", default=env_vars.get("AUTHORIZED_USERS", ""), show_default=True)
+            chat_id = click.prompt("  Notification Chat ID", default=env_vars.get("NOTIFICATION_CHAT_ID", ""), show_default=True)
+
+            env_vars["TELEGRAM_TOKEN"] = token
+            env_vars["AUTHORIZED_USERS"] = users
+            env_vars["NOTIFICATION_CHAT_ID"] = chat_id
+            modified = True
+
+        elif choice == 4:
+            # Edit Integrations
+            click.secho("\n--- Integrations ---\n", fg=CYAN)
+
+            brave = click.prompt("  Brave Search API Key", default=env_vars.get("BRAVE_API_KEY", ""), show_default=False)
+            if brave:
+                env_vars["BRAVE_API_KEY"] = brave
+                modified = True
+
+            gmail = click.prompt("  Gmail User", default=env_vars.get("GMAIL_USER", ""), show_default=False)
+            if gmail:
+                env_vars["GMAIL_USER"] = gmail
+                gmail_pass = click.prompt("  Gmail App Password", default="", hide_input=True, show_default=False)
+                if gmail_pass:
+                    env_vars["GMAIL_APP_PASSWORD"] = gmail_pass
+                modified = True
+
+            # Whisper language
+            lang = click.prompt("  Whisper Language", default=cfg.get("WHISPER_LANGUAGE", "en"), show_default=True)
+            if lang != cfg.get("WHISPER_LANGUAGE"):
+                cfg["WHISPER_LANGUAGE"] = lang
+                modified = True
+
+            # Timezone
+            tz = click.prompt("  Timezone offset (hours)", default=cfg.get("TIMEZONE_OFFSET_HOURS", -3), type=int, show_default=True)
+            if tz != cfg.get("TIMEZONE_OFFSET_HOURS"):
+                cfg["TIMEZONE_OFFSET_HOURS"] = tz
+                modified = True
+
+        elif choice == 5:
+            # Edit WIZ Lights
+            click.secho("\n--- WIZ Lights ---\n", fg=CYAN)
+            lights = cfg.get("WIZ_LIGHTS", {})
+
+            if lights:
+                click.secho("  Current lights:", fg=GREEN)
+                for name, ip in lights.items():
+                    if isinstance(ip, list):
+                        click.echo(f"    • {name} (group): {', '.join(ip)}")
+                    else:
+                        click.echo(f"    • {name}: {ip}")
+                click.echo()
+
+            action = click.prompt("  [a]dd / [r]emove / [d]one", default="d", show_default=True)
+
+            while action.lower() != "d":
+                if action.lower() == "a":
+                    name = click.prompt("  Light name")
+                    ip = click.prompt(f"  IP address for '{name}'")
+                    lights[name] = ip
+                    click.secho(f"  ✓ Added {name} → {ip}", fg=GREEN)
+                    modified = True
+                elif action.lower() == "r":
+                    name = click.prompt("  Light name to remove")
+                    if name in lights:
+                        del lights[name]
+                        click.secho(f"  ✓ Removed {name}", fg=GREEN)
+                        modified = True
+                    else:
+                        click.secho(f"  ✗ '{name}' not found", fg=RED)
+
+                action = click.prompt("  [a]dd / [r]emove / [d]one", default="d", show_default=True)
+
+            cfg["WIZ_LIGHTS"] = lights
+
+        elif choice == 6:
+            # Test Services
+            click.secho("\n--- Testing Services ---\n", fg=CYAN)
+
+            # Ollama
+            if _check_ollama():
+                click.secho("  ✓ Ollama: connected", fg=GREEN)
+                try:
+                    import httpx
+                    r = httpx.get("http://localhost:11434/api/tags", timeout=3)
+                    models = [m["name"] for m in r.json().get("models", [])]
+                    click.echo(f"    Models: {', '.join(models) if models else 'none downloaded'}")
+                except Exception:
+                    pass
+            else:
+                click.secho("  ✗ Ollama: not running", fg=RED)
+
+            # Telegram token
+            token = env_vars.get("TELEGRAM_TOKEN", "")
+            if token and token != "your_telegram_token_here":
+                click.secho("  ✓ Telegram token: set", fg=GREEN)
+            else:
+                click.secho("  ✗ Telegram token: not set", fg=RED)
+
+            # Gmail
+            gmail_user = env_vars.get("GMAIL_USER", "")
+            if gmail_user:
+                click.secho(f"  ✓ Gmail: configured ({gmail_user})", fg=GREEN)
+            else:
+                click.secho("  ⚠ Gmail: not configured (optional)", fg=YELLOW)
+
+            # Brave
+            brave_key = env_vars.get("BRAVE_API_KEY", "")
+            if brave_key:
+                click.secho("  ✓ Brave Search: configured", fg=GREEN)
+            else:
+                click.secho("  ⚠ Brave Search: not configured (optional)", fg=YELLOW)
+
+            # FFmpeg
+            try:
+                subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
+                click.secho("  ✓ FFmpeg: installed", fg=GREEN)
+            except (FileNotFoundError, subprocess.CalledProcessError):
+                click.secho("  ✗ FFmpeg: not found (needed for audio)", fg=RED)
+
+        elif choice == 7:
+            # Save & Exit
+            if modified:
+                click.secho("\n💾 Saving configuration...", fg=CYAN)
+
+                # Save config.yaml
+                try:
+                    with open(config_path, "w") as f:
+                        yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+                    click.secho("  ✓ config.yaml saved", fg=GREEN)
+                except Exception as e:
+                    click.secho(f"  ✗ Failed to save config.yaml: {e}", fg=RED)
+
+                # Save .env
+                try:
+                    with open(env_path, "w") as f:
+                        for k, v in env_vars.items():
+                            f.write(f"{k}={v}\n")
+                    click.secho("  ✓ .env saved", fg=GREEN)
+                except Exception as e:
+                    click.secho(f"  ✗ Failed to save .env: {e}", fg=RED)
+
+                click.secho("\n✓ Configuration saved! Restart the bot to apply changes.", fg=GREEN, bold=True)
+            else:
+                click.secho("\nNo changes made.", fg=YELLOW)
+            break
+
+        elif choice == 8:
+            if modified:
+                if not click.confirm("  You have unsaved changes. Exit anyway?", default=False):
+                    continue
+            click.secho("Exiting without saving.", fg=YELLOW)
+            break
 
 
 # ─── MEMORY ───────────────────────────────────────────────────────────

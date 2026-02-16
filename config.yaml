@@ -36,3 +36,12 @@ RAG:
   CHUNK_OVERLAP: 200
   SIMILARITY_THRESHOLD: 0.4
   MAX_RESULTS: 3
+
+# Optional features (set to false to disable)
+FEATURES:
+  WIZ_LIGHTS: true
+  EMAIL_DIGEST: true
+  MATH_SOLVER: true
+  DEEP_RESEARCH: true
+  YOUTUBE: true
+  TWITTER: true

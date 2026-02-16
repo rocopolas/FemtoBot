@@ -10,21 +10,30 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
-    "click>=8.0",
-    "python-telegram-bot==22.6",
-    "httpx==0.28.1",
-    "python-dotenv==1.2.1",
-    "PyYAML==6.0.3",
-    "faster-whisper==1.2.1",
-    "chromadb>=0.4.0",
+    "click",
+    "python-telegram-bot[job-queue]",
+    "httpx",
+    "python-dotenv",
+    "PyYAML",
+    "faster-whisper",
+    "chromadb",
     "telegramify-markdown",
     "pymupdf",
     "python-docx",
+    "markdown",
+    "psutil",
+    "trafilatura",
+]
+
+[project.optional-dependencies]
+lights = ["pywizlight"]
+media = ["yt-dlp"]
+research = ["odfpy"]
+email = []  # uses stdlib imaplib, no extra deps
+full = [
     "pywizlight",
     "yt-dlp",
     "odfpy",
-    "markdown",
-    "trafilatura>=1.12.0"
 ]
 
 [project.scripts]
@@ -40,3 +49,6 @@ packages = ["src", "src.handlers", "src.jobs", "src.memory", "src.middleware",
 data = ["*.md", "*.txt"]
 assets = ["*.tcss"]
 src = ["instructions.md"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
