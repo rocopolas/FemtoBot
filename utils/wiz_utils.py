@@ -1,6 +1,8 @@
-"""Utilities for controlling WIZ lights."""
 import asyncio
+import logging
 from utils.config_loader import get_config
+
+logger = logging.getLogger(__name__)
 
 # Lazy load pywizlight to avoid import errors if not installed
 _wizlight = None
@@ -78,40 +80,42 @@ COLOR_MAP = {
 async def turn_on_light(ip: str, brightness: int = 100, color: str = None) -> bool:
     """Turn on a light with optional brightness and color."""
     if not _load_pywizlight():
+        logger.error("pywizlight module not loaded")
         return False
     
     try:
-        light = _wizlight(ip)
-        
-        if color and color.lower() in COLOR_MAP:
-            rgb = COLOR_MAP[color.lower()]
-            if rgb:
-                await light.turn_on(_PilotBuilder(rgb=rgb, brightness=brightness))
-            elif color.lower() in ("calido", "warm"):
-                await light.turn_on(_PilotBuilder(colortemp=2700, brightness=brightness))
-            elif color.lower() in ("frio", "cool"):
-                await light.turn_on(_PilotBuilder(colortemp=6500, brightness=brightness))
+        # Use async context manager to ensure connection is closed
+        async with _wizlight(ip) as light:
+            if color and color.lower() in COLOR_MAP:
+                rgb = COLOR_MAP[color.lower()]
+                if rgb:
+                    await light.turn_on(_PilotBuilder(rgb=rgb, brightness=brightness))
+                elif color.lower() in ("calido", "warm"):
+                    await light.turn_on(_PilotBuilder(colortemp=2700, brightness=brightness))
+                elif color.lower() in ("frio", "cool"):
+                    await light.turn_on(_PilotBuilder(colortemp=6500, brightness=brightness))
+                else:
+                    await light.turn_on(_PilotBuilder(colortemp=4000, brightness=brightness))
             else:
-                await light.turn_on(_PilotBuilder(colortemp=4000, brightness=brightness))
-        else:
-            await light.turn_on(_PilotBuilder(brightness=brightness))
+                await light.turn_on(_PilotBuilder(brightness=brightness))
         
         return True
     except Exception as e:
-        print(f"[WIZ] Error turning on {ip}: {e}")
+        logger.error(f"[WIZ] Error turning on {ip}: {e}")
         return False
 
 async def turn_off_light(ip: str) -> bool:
     """Turn off a light."""
     if not _load_pywizlight():
+        logger.error("pywizlight module not loaded")
         return False
     
     try:
-        light = _wizlight(ip)
-        await light.turn_off()
+        async with _wizlight(ip) as light:
+            await light.turn_off()
         return True
     except Exception as e:
-        print(f"[WIZ] Error turning off {ip}: {e}")
+        logger.error(f"[WIZ] Error turning off {ip}: {e}")
         return False
 
 async def control_light(name: str, action: str, value: str = None) -> str:
