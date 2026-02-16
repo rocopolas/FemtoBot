@@ -84,20 +84,19 @@ async def turn_on_light(ip: str, brightness: int = 100, color: str = None) -> bo
         return False
     
     try:
-        # Use async context manager to ensure connection is closed
-        async with _wizlight(ip) as light:
-            if color and color.lower() in COLOR_MAP:
-                rgb = COLOR_MAP[color.lower()]
-                if rgb:
-                    await light.turn_on(_PilotBuilder(rgb=rgb, brightness=brightness))
-                elif color.lower() in ("calido", "warm"):
-                    await light.turn_on(_PilotBuilder(colortemp=2700, brightness=brightness))
-                elif color.lower() in ("frio", "cool"):
-                    await light.turn_on(_PilotBuilder(colortemp=6500, brightness=brightness))
-                else:
-                    await light.turn_on(_PilotBuilder(colortemp=4000, brightness=brightness))
+        light = _wizlight(ip)
+        if color and color.lower() in COLOR_MAP:
+            rgb = COLOR_MAP[color.lower()]
+            if rgb:
+                await light.turn_on(_PilotBuilder(rgb=rgb, brightness=brightness))
+            elif color.lower() in ("calido", "warm"):
+                await light.turn_on(_PilotBuilder(colortemp=2700, brightness=brightness))
+            elif color.lower() in ("frio", "cool"):
+                await light.turn_on(_PilotBuilder(colortemp=6500, brightness=brightness))
             else:
-                await light.turn_on(_PilotBuilder(brightness=brightness))
+                await light.turn_on(_PilotBuilder(colortemp=4000, brightness=brightness))
+        else:
+            await light.turn_on(_PilotBuilder(brightness=brightness))
         
         return True
     except Exception as e:
@@ -111,8 +110,8 @@ async def turn_off_light(ip: str) -> bool:
         return False
     
     try:
-        async with _wizlight(ip) as light:
-            await light.turn_off()
+        light = _wizlight(ip)
+        await light.turn_off()
         return True
     except Exception as e:
         logger.error(f"[WIZ] Error turning off {ip}: {e}")
