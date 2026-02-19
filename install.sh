@@ -235,10 +235,7 @@ if [ ! -f ".env" ]; then
     fi
 else
     echo -e "${GREEN}✓ .env already exists${NC}"
-fi
-
-echo "ANONYMIZED_TELEMETRY=False" >> .env
-echo "CHROMA_SERVER_NOFILE=1" >> .env
+fi 
 
 # 5. Global CLI Installation (Mandatory)
 echo -e "\n${CYAN}[5/6] Installing 'femtobot' CLI globally...${NC}"
