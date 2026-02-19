@@ -1,46 +1,27 @@
-# ═══════════════════════════════════════════════════════════════
-#                    FEMTOBOT - CONFIGURACIÓN
-# ═══════════════════════════════════════════════════════════════
-MODEL: "qwen3:8b"
-VISION_MODEL: "qwen3-vl:2b"
-MATH_MODEL: "qwen2-math:7b"
-OCR_MODEL: "glm-ocr:latest" # Model for OCR (e.g. glm-ocr, llama3.2-vision)
+MODEL: qwen3:8b
+VISION_MODEL: qwen3-vl:2b
+MATH_MODEL: qwen2-math:7b
+OCR_MODEL: glm-ocr:latest
 CONTEXT_LIMIT: 30000
-WHISPER_LANGUAGE: "es"
-WHISPER_MODEL_VOICE: "turbo"
-WHISPER_MODEL_EXTERNAL: "turbo"
+WHISPER_LANGUAGE: es
+WHISPER_MODEL_VOICE: turbo
+WHISPER_MODEL_EXTERNAL: turbo
 INACTIVITY_TIMEOUT_MINUTES: 60
 CRON_CLEANUP_INTERVAL_MINUTES: 30
 TIMEZONE_OFFSET_HOURS: -3
-EMAIL_DIGEST_TIME: "08:00"
-EVENTS_CHECK_INTERVAL_SECONDS: 60  
-EVENTS_FILE: "data/events.txt"
-INSTRUCTIONS_FILE: "data/instructions.md"
-
-# Luces WIZ (nombre: IP o lista de IPs)
-WIZ_LIGHTS:
-  # Luces individuales
-  luz_esquina: "192.168.0.122"
-  luz_solitaria: "192.168.0.64"
-  luz_cama: "192.168.0.117"
-  
-  pieza: 
-    - "192.168.0.122"
-    - "192.168.0.64"
-    - "192.168.0.117"
-
-# RAG / Memoria
+EMAIL_DIGEST_TIME: 08:00
+EVENTS_CHECK_INTERVAL_SECONDS: 60
+EVENTS_FILE: data/events.txt
+INSTRUCTIONS_FILE: data/instructions.md
 RAG:
-  EMBEDDING_MODEL: "qwen3-embedding:0.6b"
+  EMBEDDING_MODEL: qwen3-embedding:0.6b
   CHUNK_SIZE: 1000
   CHUNK_OVERLAP: 200
   SIMILARITY_THRESHOLD: 0.4
   MAX_RESULTS: 3
-
-# Optional features (set to false to disable)
 FEATURES:
-  WIZ_LIGHTS: true
-  EMAIL_DIGEST: true
+  WIZ_LIGHTS: false
+  EMAIL_DIGEST: false
   MATH_SOLVER: true
   DEEP_RESEARCH: true
   YOUTUBE: true

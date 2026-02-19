@@ -5,21 +5,30 @@ Summary: Smart personal assistant for small local LLMs
 License-Expression: MIT
 Requires-Python: >=3.12
 Description-Content-Type: text/markdown
-Requires-Dist: click>=8.0
-Requires-Dist: python-telegram-bot==22.6
-Requires-Dist: httpx==0.28.1
-Requires-Dist: python-dotenv==1.2.1
-Requires-Dist: PyYAML==6.0.3
-Requires-Dist: faster-whisper==1.2.1
-Requires-Dist: chromadb>=0.4.0
+Requires-Dist: click
+Requires-Dist: python-telegram-bot[job-queue]
+Requires-Dist: httpx
+Requires-Dist: python-dotenv
+Requires-Dist: PyYAML
+Requires-Dist: faster-whisper
+Requires-Dist: chromadb
 Requires-Dist: telegramify-markdown
 Requires-Dist: pymupdf
 Requires-Dist: python-docx
-Requires-Dist: pywizlight
-Requires-Dist: yt-dlp
 Requires-Dist: markdown
-Requires-Dist: psutil>=5.9.0
-
+Requires-Dist: psutil
+Requires-Dist: trafilatura
+Provides-Extra: lights
+Requires-Dist: pywizlight; extra == "lights"
+Provides-Extra: media
+Requires-Dist: yt-dlp; extra == "media"
+Provides-Extra: research
+Requires-Dist: odfpy; extra == "research"
+Provides-Extra: email
+Provides-Extra: full
+Requires-Dist: pywizlight; extra == "full"
+Requires-Dist: yt-dlp; extra == "full"
+Requires-Dist: odfpy; extra == "full"
 
 
 ![FemtoBot Logo](https://files.catbox.moe/zhkn08.jpg)
@@ -39,6 +48,7 @@ A smart personal assistant designed for small local models, recommended for GPUs
 - 🖼️ **Image search** - Search for images on the web
 - 📄 **Document reading** - Analyze and chat with PDF or text files
 - 📧 **Email digest** - Read and summarize emails from Gmail
+- 🧠 **Deep Research** - Perform iterative research on a topic
 - ⏰ **Reminders** - Schedule cron tasks that notify you in chat
 - 💡 **Smart lights** - Control WIZ lights via chat
 - 🧮 **Math solver** - Solve complex equations and symbolic math problems
@@ -51,22 +61,252 @@ A smart personal assistant designed for small local models, recommended for GPUs
 **Youtube summary**
 ![FemtoBot in action](https://files.catbox.moe/c9b2ct.jpg)
 
-## 🤔 Why FemtoBot?
 
-| | FemtoBot | Cloud Bots (Claude, GPT) |
-|---|---|---|
-| 💰 **Cost** | **Free** | $20+/month or pay per use |
-| 🔒 **Privacy** | Your data never leaves your PC | Your chats go to external servers |
-| ⚡ **Speed** | Small models = instant responses | Depends on API and your plan |
-| 🌐 **Internet** | Works offline | Requires constant connection |
-| 🎛️ **Control** | You choose model, context, everything | Limited to what they offer |
-| 🏠 **Smart Home** | Control your lights, all local | Not available |
+## 🚀 Installation & Setup
 
-**Ideal for:**
-- Using small and fast models (7B-14B params)
-- Keeping your privacy at 100%
-- Not paying monthly subscriptions
-- Having a personal assistant that runs on YOUR hardware
+FemtoBot is designed to be easy to install and runs entirely locally. You can use the automated setup script or install it manually.
+
+### 📋 Prerequisites
+
+- **Python 3.12** (Strictly required)
+- **Git** needed to clone the repository
+- **[Ollama](https://ollama.ai)** installed and running (`ollama serve`)
+- **FFmpeg** required for audio transcription features
+
+---
+
+### ⚡ Option 1: Automated Installation (Recommended)
+
+This is the fastest way to get started. The `run.sh` script handles environment creation and dependencies.
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/rocopolas/FemtoBot.git
+    cd FemtoBot
+    ```
+
+2.  **Run the setup script:**
+    ```bash
+    chmod +x run.sh
+    ./run.sh
+    ```
+    This script will:
+    - Check for Python 3.12
+    - Create a virtual environment (`venv_bot`)
+    - Install all required dependencies
+    - specificy `femtobot` command installation
+
+3.  **Install the System-wide CLI (Optional):**
+    To use the `femtobot` command from any terminal:
+    ```bash
+    chmod +x scripts/install_cli.sh
+    sudo ./scripts/install_cli.sh # requires sudo
+    ```
+
+---
+
+### 🛠️ Option 2: Manual Installation
+
+If you prefer to configure the environment yourself:
+
+1.  **Clone and enter the directory:**
+    ```bash
+    git clone https://github.com/rocopolas/FemtoBot.git
+    cd FemtoBot
+    ```
+
+2.  **Create and activate virtual environment:**
+    ```bash
+    python3.12 -m venv venv_bot
+    source venv_bot/bin/activate
+    # On Windows: venv_bot\Scripts\activate
+    ```
+
+3.  **Install dependencies:**
+    ```bash
+    pip install --upgrade pip
+    pip install -r requirements.txt
+    ```
+
+---
+
+### 🐳 Option 3: Docker
+
+Run FemtoBot and Ollama together using Docker Compose:
+
+```bash
+git clone https://github.com/rocopolas/FemtoBot.git
+cd FemtoBot
+cp .env.example .env
+# Edit .env with your tokens
+docker compose up -d
+```
+
+> **Note:** GPU passthrough is configured for NVIDIA GPUs. Edit `docker-compose.yml` if you use a different GPU or CPU-only.
+
+---
+
+
+### ⚙️ Initial Configuration
+
+After installation, run the setup command to initialize your environment:
+
+```bash
+femtobot setup
+```
+
+This interactive command will:
+1.  **Configure Environment**: Prompt you for your Telegram Token, Authorized Users, and other settings to create your `.env` file.
+2.  **Select Features**: Choose which optional features to enable (lights, email, YouTube, etc.).
+3.  **Auto-detect Language**: Detect your system locale and set Whisper language automatically.
+4.  **Download Models**: Pull the necessary Ollama models defined in `config.yaml`.
+5.  **Create Data Files**: Initialize default instructions and memory files.
+
+*Note: Ensure [Ollama](https://ollama.com/) is running (`ollama serve`) before running setup.*
+
+### 🏥 System Check
+
+After setup, it is highly recommended to run the doctor command to verify your installation:
+
+```bash
+femtobot doctor
+```
+
+This will check for:
+- Correct Python version
+- Virtual environment activation (if applicable)
+- Configuration file validity
+- Ollama connectivity and model availability
+
+---
+
+### 🧙 Configuration Wizard
+
+For a more visual and interactive way to manage your settings after the initial setup, use the built-in wizard:
+
+```bash
+femtobot wizard
+```
+
+This tool provides a terminal-based menu system to:
+- **Toggle Features**: Enable or disable specific utility services (WIZ, Gmail, etc.).
+- **Update Credentials**: Securely update API keys and tokens.
+- **Model Selection**: Switch between different Ollama models for chat and vision.
+
+
+### 🖥️ CLI Commands
+
+Once installed, you can manage FemtoBot using the CLI:
+
+```bash
+# Core Commands
+femtobot start      # Start the bot daemon
+femtobot stop       # Stop the daemon
+femtobot status     # Check bot and Ollama connection
+femtobot logs -f    # View real-time logs
+
+# Tools
+femtobot tui        # Open the Terminal User Interface
+femtobot config     # View current configuration
+femtobot setup      # Guided setup (features, models, tokens)
+femtobot wizard     # Interactive configurator (edit config via menus)
+femtobot doctor     # Diagnose issues
+femtobot update     # Pull setup updates
+```
+
+
+## ⚙️ Configuration
+
+### `.env`
+```env
+TELEGRAM_TOKEN=your_botfather_token
+AUTHORIZED_USERS=123456789  # Your Telegram ID
+NOTIFICATION_CHAT_ID=123456789
+BRAVE_API_KEY=your_api_key  # Optional, for searches
+GMAIL_USER=your_email@gmail.com  # Optional, for email digest
+GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
+```
+
+### `config.yaml`
+```yaml
+MODEL: "llama3.1:latest"
+VISION_MODEL: "qwen3-vl:2b"
+CONTEXT_LIMIT: 200000
+WHISPER_LANGUAGE: "en"
+WHISPER_MODEL_VOICE: "base"
+WHISPER_MODEL_EXTERNAL: "medium"
+INACTIVITY_TIMEOUT_MINUTES: 5
+
+# RAG / Memory Configuration
+RAG:
+  EMBEDDING_MODEL: "nomic-embed-text"
+  CHUNK_SIZE: 1000
+  SIMILARITY_THRESHOLD: 0.4
+  MAX_RESULTS: 3
+
+# Optional features (set to false to disable)
+FEATURES:
+  WIZ_LIGHTS: true
+  EMAIL_DIGEST: true
+  MATH_SOLVER: true
+  DEEP_RESEARCH: true
+  YOUTUBE: true
+  TWITTER: true
+```
+
+## 🎮 Usage
+
+### Telegram Bot
+```bash
+./run.sh
+```
+
+### TUI Interface
+```bash
+source venv_bot/bin/activate
+python src/main.py
+```
+
+**TUI Features:**
+- 💾 **Persistent History**: Conversations saved automatically
+- 📂 **Session Management**: Save/load multiple sessions
+- 📄 **Export**: Export conversations to markdown
+- 🔔 **Notifications**: Receive cron notifications in TUI
+- ⌨️ **Slash Commands**: Quick access to functions
+
+**TUI Commands:**
+```
+/status         - View token usage and model status
+/deep           - Start deep research
+/new, /clear    - Start new conversation
+/save [name]    - Save current session
+/load [name]    - Load saved session
+/sessions       - List all saved sessions
+/export [file]  - Export to markdown file
+/unload         - Unload models from RAM
+/help           - Show all commands
+```
+
+### Running Tests
+```bash
+# Install test dependencies
+pip install pytest pytest-asyncio pytest-cov
+
+# Run all tests
+pytest tests/ -v
+
+# With coverage
+pytest tests/ --cov=src --cov=utils
+```
+
+## 📱 Telegram Commands
+
+| Command | Description |
+|---------|-------------|
+| `/start` | Start conversation |
+| `/new` | New conversation (clears history) |
+| `/status` | View context and token usage |
+| `/unload` | Unload all models from RAM |
 
 ## 📁 Project Structure
 ```
@@ -179,281 +419,6 @@ FemtoBot/
 └─────────────────────────────────────────────┘
 ```
 
-## 🚀 Quick Start
-
-### Requirements
-- **Python 3.12** (Strictly required)
-- [Ollama](https://ollama.ai) installed and running
-- FFmpeg (for audio transcription)
-- **ChromaDB** (installed automatically)
-
-### Installation & Run
-
-1. **Clone the repository:**
-```bash
-git clone https://github.com/rocopolas/FemtoBot.git
-cd FemtoBot
-```
-
-2. **Setup & install CLI:**
-```bash
-chmod +x run.sh && ./run.sh   # Creates venv + installs deps + starts bot
-```
-Once the venv is ready, install the `femtobot` command system-wide:
-```bash
-chmod +x scripts/install_cli.sh
-./scripts/install_cli.sh       # Requires sudo
-```
-
-3. **Use from anywhere (no venv activation needed):**
-```bash
-# Bot management
-femtobot serve     # Start bot (foreground)
-femtobot start     # Start bot (background daemon)
-femtobot stop      # Stop the daemon
-femtobot restart   # Restart the daemon
-femtobot status    # Show bot + Ollama status
-femtobot logs      # Show recent logs
-femtobot logs -f   # Follow logs in real-time
-femtobot tui       # Launch TUI interface
-
-# Configuration & setup
-femtobot config    # Show current configuration
-femtobot setup     # Download Ollama models from config.yaml
-femtobot update    # Git pull + reinstall dependencies
-femtobot doctor    # Run full diagnostic checks
-
-# Memory (RAG)
-femtobot memory status           # Show memory stats
-femtobot memory search "query"   # Search vector memory
-
-# Backup & restore
-femtobot backup              # Backup data + config to ~/.femtobot/
-femtobot restore backup.tar.gz   # Restore from backup
-```
-
-3. **Configure environment variables:**
-```bash
-cp .env.example .env
-# Edit .env with your tokens (Telegram, Brave, Gmail)
-```
-
-4. **Download Models:**
-```bash
-# Chat Model
-ollama pull qwen3:8b
-
-# Vision Model
-ollama pull qwen3-vl:2b
-
-# Math Model
-ollama pull qwen2-math:7b
-
-# OCR Model
-ollama pull glm-ocr:latest
-
-# Embedding Model (Required for RAG)
-ollama pull nomic-embed-text
-# (You may need to update config.yaml if using a different embedding model)
-```
-
-## ⚙️ Configuration
-
-### `.env`
-```env
-TELEGRAM_TOKEN=your_botfather_token
-AUTHORIZED_USERS=123456789  # Your Telegram ID
-NOTIFICATION_CHAT_ID=123456789
-BRAVE_API_KEY=your_api_key  # Optional, for searches
-GMAIL_USER=your_email@gmail.com  # Optional, for email digest
-GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
-```
-
-### `config.yaml`
-```yaml
-MODEL: "llama3.1:latest"
-VISION_MODEL: "qwen3-vl:2b"
-CONTEXT_LIMIT: 200000
-WHISPER_LANGUAGE: "es"
-WHISPER_MODEL_VOICE: "base"
-WHISPER_MODEL_EXTERNAL: "medium"
-INACTIVITY_TIMEOUT_MINUTES: 5
-
-# RAG / Memory Configuration
-RAG:
-  EMBEDDING_MODEL: "nomic-embed-text" # Must match ollama pull
-  CHUNK_SIZE: 1000
-  SIMILARITY_THRESHOLD: 0.4 # Lower = looser matching
-  MAX_RESULTS: 3
-```
-
-## 🎮 Usage
-
-### Telegram Bot
-```bash
-./run.sh
-```
-
-### TUI Interface
-```bash
-source venv_bot/bin/activate
-python src/main.py
-```
-
-**TUI Features:**
-- 💾 **Persistent History**: Conversations saved automatically
-- 📂 **Session Management**: Save/load multiple sessions
-- 📄 **Export**: Export conversations to markdown
-- 🔔 **Notifications**: Receive cron notifications in TUI
-- ⌨️ **Slash Commands**: Quick access to functions
-
-**TUI Commands:**
-```
-/status         - View token usage and model status
-/new, /clear    - Start new conversation
-/save [name]    - Save current session
-/load [name]    - Load saved session
-/sessions       - List all saved sessions
-/export [file]  - Export to markdown file
-/unload         - Unload models from RAM
-/help           - Show all commands
-```
-
-### Running Tests
-```bash
-# Install test dependencies
-pip install pytest pytest-asyncio pytest-cov
-
-# Run all tests
-pytest tests/ -v
-
-# With coverage
-pytest tests/ --cov=src --cov=utils
-```
-
-## 📱 Telegram Commands
-
-| Command | Description |
-|---------|-------------|
-| `/start` | Start conversation |
-| `/new` | New conversation (clears history) |
-| `/status` | View context and token usage |
-| `/unload` | Unload all models from RAM |
-
-## 🎤 Special Features
-
-### 👁️ Image Analysis
-- Send a photo → Vision model describes it, text model responds
-- Send photo + caption → Bot considers both for response
-
-### 🎙️ Audio Transcription
-- Send a voice message → Transcribed and answered
-- Send an audio file → Transcription only (larger model)
-
-### 🎥 YouTube Summary & Download
-- Send a YouTube link → Bot downloads, transcribes and summarizes (Default)
-- Send link + "download" → Bot sends you the video file
-
-### 🐦 Twitter/X Media Download
-- Send a Twitter/X link and ask to "download" or "bajar"
-- The bot will download the video/image and send the file to you
-
-### 📦 Subida de Archivos (Catbox.moe)
-- **Subida Directa**: Envía una foto o video con el mensaje "sube a catbox" o "dame el link".
-- **Respuesta**: Responde a cualquier imagen o video (tuyo o del bot) con "sube esto" y el bot te devolverá un enlace directo permanente.
-
-
-### 🔍 Smart Image Search
-- Ask: "Give me a photo of [something]" or "Search for an image of [something]"
-- The **LLM decides** to search for an image and uses the command `:::foto...:::`.
-- The bot searches Brave Images, then uses its **Vision Model** to look at the candidates.
-- It only sends the image if the AI confirms it matches your request!
-
-### 🧮 Math Solver
-- **Automatic Detection**: Ask any math problem (algebra, calculus, matrices, etc.).
-- The bot detects the intent and automatically switches to a **Specialized Math Model** (configured in `config.yaml`).
-- **Formatted Response**: You receive a step-by-step solution with perfect **LaTeX** rendering in Telegram.
-- **Examples:**
-  - "Solve the integral of x^2 dx"
-  - "Find the roots of 2x^2 + 5x - 3 = 0"
-  - "Calculate the eigenvalues of the matrix..."
-
-### 📄 Document Reading & OCR
-- Send a PDF, DOCX, or TXT file → Bot extracts text and responds.
-- **Automatic OCR**: If the document is scanned (text density < 15 words/page), the bot automatically:
-  1. Converts pages to high-res images.
-  2. Uses the Vision Model (`glm-4v` by default) to read the content.
-  3. Formats **Mathematical Formulas** (LaTeX) into readable text (e.g., converts `$x^2$` to `x²`).
-- **Math Support**: Detects and beautifully renders complex math formulas from academic papers.
-- Send document + caption → Bot considers both for response.
-
-### ⏰ Reminders
-Ask the bot things like:
-- "Remind me to drink water every hour"
-- "Notify me tomorrow at 9am about my meeting"
-
-### 🧠 Vector Memory (RAG)
-The bot uses a local vector database (ChromaDB) to remember facts and conversations.
-
-**To learn new things:**
-- Just tell it: *"My mom is Jessica"* → Auto-saved if deemed important.
-- Force save: `:::memory Data to save:::`
-
-**To forget:**
-- `:::memory_delete Data to forget:::`
-- Detects the most similar memory (>85% match) and deletes it.
-
-**To view usage:**
-- Look for **"🧠 RAG..."** status when the bot is searching its memory.
-
-
-### 📧 Email Digest (Optional)
-If Gmail is configured, the bot will:
-- Run at 4:00 AM daily
-- Read emails from the last 24 hours
-- Use LLM to identify important emails
-- Send you a summary on Telegram
-
-### 💡 Smart Lights (Optional)
-Control WIZ lights via natural language:
-- "Turn off the bedroom lights"
-- "Set brightness to 50%"
-- "Change color to red"
-- "Turn off all lights"
-
-**Configuration** in `config.yaml`:
-```yaml
-WIZ_LIGHTS:
-  bedroom:  # Single light
-    - "192.168.0.121"
-  living:   # Multiple lights (group)
-    - "192.168.0.63"
-    - "192.168.0.115"
-```
-
-**Requires**: `pip install pywizlight`
-
-## 🔧 Development
-
-### Architecture
-The project uses a modular architecture:
-- **Handlers**: Separate modules for different message types
-- **Jobs**: Background tasks (cleanup, notifications)
-- **State**: Thread-safe chat history management
-- **Middleware**: Rate limiting and other cross-cutting concerns
-
-See `docs/architecture.md` for detailed information.
-
-### Adding new features
-1. Create the module in `utils/`
-2. Import it in appropriate handler
-3. Add instructions in `data/instructions.md`
-
-### Changing model
-Edit `config.yaml`:
-```yaml
-MODEL: "your-model:tag"
-```
 
 ## 🐛 Troubleshooting
 

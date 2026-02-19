@@ -1,5 +1,10 @@
 README.md
 pyproject.toml
+assets/__init__.py
+assets/styles.tcss
+data/__init__.py
+data/events.txt
+data/instructions.md
 femtobot.egg-info/PKG-INFO
 femtobot.egg-info/SOURCES.txt
 femtobot.egg-info/dependency_links.txt
@@ -27,8 +32,13 @@ src/jobs/events.py
 src/jobs/inactivity.py
 src/memory/vector_store.py
 src/middleware/rate_limiter.py
+src/scripts/__init__.py
+src/scripts/install_python.sh
+src/scripts/trigger_notification.py
 src/services/command_service.py
+src/services/deep_research_service.py
 src/services/media_service.py
+src/services/message_processor.py
 src/services/rag_service.py
 src/services/upload_service.py
 src/state/chat_manager.py
@@ -43,8 +53,10 @@ utils/config_loader.py
 utils/cron_utils.py
 utils/document_utils.py
 utils/email_utils.py
+utils/logger.py
 utils/search_utils.py
 utils/telegram_utils.py
 utils/twitter_utils.py
+utils/web_fetcher.py
 utils/wiz_utils.py
 utils/youtube_utils.py

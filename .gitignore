@@ -3,6 +3,9 @@
 /__pycache__
 /venv_bot
 **/__pycache__/
+femtobot.egg-info/
+src/__pycache__/
+utils/__pycache__/
 /.pytest_cache
 /data/chroma_db
 /dist/
@@ -14,3 +17,4 @@ femtobot.pid
 .bot.pid
 *.pid
 .gemini/
+

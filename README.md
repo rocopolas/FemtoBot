@@ -29,218 +29,41 @@ A smart personal assistant designed for small local models, recommended for GPUs
 **Youtube summary**
 ![FemtoBot in action](https://files.catbox.moe/c9b2ct.jpg)
 
-## 🤔 Why FemtoBot?
-
-| | FemtoBot | Cloud Bots (Claude, GPT) |
-|---|---|---|
-| 💰 **Cost** | **Free** | $20+/month or pay per use |
-| 🔒 **Privacy** | Your data never leaves your PC | Your chats go to external servers |
-| ⚡ **Speed** | Small models = instant responses | Depends on API and your plan |
-| 🌐 **Internet** | Works offline | Requires constant connection |
-| 🎛️ **Control** | You choose model, context, everything | Limited to what they offer |
-| 🏠 **Smart Home** | Control your lights, all local | Not available |
-
-**Ideal for:**
-- Using small and fast models (7B-14B params)
-- Keeping your privacy at 100%
-- Not paying monthly subscriptions
-- Having a personal assistant that runs on YOUR hardware
-
-## 📁 Project Structure
-```
-FemtoBot/
-├── config.yaml              # Main configuration
-├── .env                     # Environment variables (tokens)
-├── requirements.txt         # Python dependencies
-├── run.sh                   # Run script (setup + run)
-│
-├── src/                     # Source code
-│   ├── telegram_bot.py      # Main Telegram bot (Entry Point)
-│   ├── tui.py              # TUI interface
-│   ├── client.py           # Ollama client
-│   ├── constants.py        # Global constants
-│   ├── services/           # Business Logic Services
-│   │   ├── rag_service.py      # RAG & Context Management
-│   │   ├── media_service.py    # Twitter/YouTube handling
-│   │   └── command_service.py  # Internal bot commands
-│   ├── handlers/           # Message handlers
-│   │   ├── commands.py     # Bot slash commands
-│   │   ├── voice.py        # Voice messages
-│   │   ├── audio.py        # Audio files
-│   │   ├── photo.py        # Images
-│   │   └── document.py     # Documents
-│   ├── jobs/               # Background jobs
-│   │   ├── events.py       # Event notifications
-│   │   ├── inactivity.py   # Auto-unload models
-│   │   ├── cleanup.py      # Cleanup old data
-│   │   └── email_digest.py # Email summary
-│   ├── middleware/         # Middleware
-│   │   └── rate_limiter.py # Rate limiting
-│   ├── state/              # State management
-│   │   └── chat_manager.py # Chat history
-│   └── memory/             # Long-term Memory
-│       └── vector_store.py # ChromaDB wrapper
-│
-├── utils/                   # Utility modules
-│   ├── audio_utils.py       # Whisper transcription
-│   ├── youtube_utils.py     # YouTube audio download
-│   ├── twitter_utils.py     # Twitter/X downloads
-│   ├── search_utils.py      # Brave search
-│   ├── cron_utils.py        # Crontab management
-│   ├── document_utils.py    # PDF/DOCX extraction
-│   ├── email_utils.py       # Gmail integration
-│   ├── wiz_utils.py         # WIZ smart lights
-│   ├── telegram_utils.py    # Telegram helpers
-│   └── config_loader.py     # YAML config loader
-│
-├── tests/                   # Test suite
-│   ├── conftest.py
-│   └── unit/
-│
-├── docs/                    # Documentation
-│   ├── architecture.md
-│   └── troubleshooting.md
-│
-├── data/                    # Data files
-│   ├── instructions.md      # LLM instructions
-│   ├── memory.md            # User memory
-│   └── events.txt           # Notification queue
-│
-└── assets/                  # Resources
-    └── styles.tcss          # TUI styles
-```
-## System Architecture
-
-```
-┌─────────────────────────────────────────────┐
-│         User Interfaces                     │
-│  ┌──────────────┐    ┌─────────────────┐    │
-│  │   Telegram   │    │   TUI (Textual) │    │
-│  │    Bot       │    │   (Terminal)    │    │
-│  └──────┬───────┘    └────────┬──────── ┘   │
-└─────────┼─────────────────────┼─────────────┘
-          │                     │
-          └──────────┬──────────┘
-                     │
-┌────────────────────┴────────────────────────┐
-│          Message Processing Layer           │
-│  - Queue-based sequential processing        │
-│  - Command parsing (:::command:::)          │
-│  - Media handling (voice, photo, docs)      │
-└────────────────────┬────────────────────────┘
-                     │
-┌────────────────────┴────────────────────────┐
-│          LLM Integration (Ollama)           │
-│  - Streaming chat API                       │
-│  - Vision model for image analysis          │
-│  - Context management with pruning          │
-└────────────────────┬────────────────────────┘
-                     │
-┌────────────────────┴────────────────────────┐
-│           Utility Services                  │
-│  ┌─────────┐ ┌─────────┐ ┌─────────────┐    │
-│  │ Whisper │ │  Brave  │ │  YouTube    │    │
-│  │(Speech) │ │ Search  │ │  Download   │    │
-│  └─────────┘ └─────────┘ └─────────────┘    │
-│  ┌─────────┐ ┌─────────┐ ┌─────────────┐    │
-│  │  WIZ    │ │  Cron   │ │  Gmail      │    │
-│  │ Lights  │ │ Jobs    │ │  IMAP       │    │
-│  └─────────┘ └─────────┘ └─────────────┘    │
-│  ┌─────────┐ ┌─────────┐ ┌─────────────┐    │
-│  │   OCR   │ │  Math   │ │  Catbox     │    │
-│  │ Service │ │ Solver  │ │  Uploads    │    │
-│  └─────────┘ └─────────┘ └─────────────┘    │
-│  ┌─────────┐ ┌─────────┐ ┌─────────────┐    │
-│  │   RAG   │ │  Docs   │ │  Calendar   │    │
-│  │ System  │ │ Reader  │ │   Events    │    │
-│  └─────────┘ └─────────┘ └─────────────┘    │
-└─────────────────────────────────────────────┘
-```
 
 ## 🚀 Installation & Setup
 
 FemtoBot is designed to be easy to install and runs entirely locally. You can use the automated setup script or install it manually.
 
-### 📋 Prerequisites
-
-- **Python 3.12** (Strictly required)
-- **Git** needed to clone the repository
-- **[Ollama](https://ollama.ai)** installed and running (`ollama serve`)
-- **FFmpeg** required for audio transcription features
-
----
-
 ### ⚡ Option 1: Automated Installation (Recommended)
 
-This is the fastest way to get started. The `run.sh` script handles environment creation and dependencies.
+This is the fastest way to get started. Just copy and run this command:
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/rocopolas/FemtoBot.git
-    cd FemtoBot
-    ```
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/rocopolas/FemtoBot/main/install.sh)"
+```
 
-2.  **Run the setup script:**
-    ```bash
-    chmod +x run.sh
-    ./run.sh
-    ```
-    This script will:
-    - Check for Python 3.12
-    - Create a virtual environment (`venv_bot`)
-    - Install all required dependencies
-    - specificy `femtobot` command installation
+This single command will:
+1.  Download the installation script.
+2.  Clone the repository automatically (if not present).
+3.  Install all system dependnecies (Python, FFmpeg, etc).
+4.  Set up the environment completely.
 
-3.  **Install the System-wide CLI (Optional):**
-    To use the `femtobot` command from any terminal:
-    ```bash
-    chmod +x scripts/install_cli.sh
-    sudo ./scripts/install_cli.sh # requires sudo
-    ```
-
----
-
-### 🛠️ Option 2: Manual Installation
-
-If you prefer to configure the environment yourself:
-
-1.  **Clone and enter the directory:**
-    ```bash
-    git clone https://github.com/rocopolas/FemtoBot.git
-    cd FemtoBot
-    ```
-
-2.  **Create and activate virtual environment:**
-    ```bash
-    python3.12 -m venv venv_bot
-    source venv_bot/bin/activate
-    # On Windows: venv_bot\Scripts\activate
-    ```
-
-3.  **Install dependencies:**
-    ```bash
-    pip install --upgrade pip
-    pip install -r requirements.txt
-    ```
-
----
-
-### 🐳 Option 3: Docker
-
-Run FemtoBot and Ollama together using Docker Compose:
-
+Alternatively, you can clone manually:
 ```bash
 git clone https://github.com/rocopolas/FemtoBot.git
 cd FemtoBot
-cp .env.example .env
-# Edit .env with your tokens
-docker compose up -d
+chmod +x install.sh
+./install.sh
 ```
 
-> **Note:** GPU passthrough is configured for NVIDIA GPUs. Edit `docker-compose.yml` if you use a different GPU or CPU-only.
+### 📋 Prerequisites
+
+- **Python 3.12+** (Will be installed automatically if missing on Ubuntu/Debian)
+- **Git**
+- **[Ollama](https://ollama.ai)** (Script will attempt to install)
+- **FFmpeg**
 
 ---
-
 
 ### ⚙️ Initial Configuration
 
@@ -403,129 +226,117 @@ pytest tests/ --cov=src --cov=utils
 | `/status` | View context and token usage |
 | `/unload` | Unload all models from RAM |
 
-## 🎤 Special Features
+## 📁 Project Structure
+```
+FemtoBot/
+├── config.yaml              # Main configuration
+├── .env                     # Environment variables (tokens)
+├── requirements.txt         # Python dependencies
+├── run.sh                   # Run script (setup + run)
+│
+├── src/                     # Source code
+│   ├── telegram_bot.py      # Main Telegram bot (Entry Point)
+│   ├── tui.py              # TUI interface
+│   ├── client.py           # Ollama client
+│   ├── constants.py        # Global constants
+│   ├── services/           # Business Logic Services
+│   │   ├── rag_service.py      # RAG & Context Management
+│   │   ├── media_service.py    # Twitter/YouTube handling
+│   │   └── command_service.py  # Internal bot commands
+│   ├── handlers/           # Message handlers
+│   │   ├── commands.py     # Bot slash commands
+│   │   ├── voice.py        # Voice messages
+│   │   ├── audio.py        # Audio files
+│   │   ├── photo.py        # Images
+│   │   └── document.py     # Documents
+│   ├── jobs/               # Background jobs
+│   │   ├── events.py       # Event notifications
+│   │   ├── inactivity.py   # Auto-unload models
+│   │   ├── cleanup.py      # Cleanup old data
+│   │   └── email_digest.py # Email summary
+│   ├── middleware/         # Middleware
+│   │   └── rate_limiter.py # Rate limiting
+│   ├── state/              # State management
+│   │   └── chat_manager.py # Chat history
+│   └── memory/             # Long-term Memory
+│       └── vector_store.py # ChromaDB wrapper
+│
+├── utils/                   # Utility modules
+│   ├── audio_utils.py       # Whisper transcription
+│   ├── youtube_utils.py     # YouTube audio download
+│   ├── twitter_utils.py     # Twitter/X downloads
+│   ├── search_utils.py      # Brave search
+│   ├── cron_utils.py        # Crontab management
+│   ├── document_utils.py    # PDF/DOCX extraction
+│   ├── email_utils.py       # Gmail integration
+│   ├── wiz_utils.py         # WIZ smart lights
+│   ├── telegram_utils.py    # Telegram helpers
+│   └── config_loader.py     # YAML config loader
+│
+├── tests/                   # Test suite
+│   ├── conftest.py
+│   └── unit/
+│
+├── docs/                    # Documentation
+│   ├── architecture.md
+│   └── troubleshooting.md
+│
+├── data/                    # Data files
+│   ├── instructions.md      # LLM instructions
+│   ├── memory.md            # User memory
+│   └── events.txt           # Notification queue
+│
+└── assets/                  # Resources
+    └── styles.tcss          # TUI styles
+```
+## System Architecture
 
-### 👁️ Image Analysis
-- Send a photo → Vision model describes it, text model responds
-- Send photo + caption → Bot considers both for response
-
-### 🎙️ Audio Transcription
-- Send a voice message → Transcribed and answered
-- Send an audio file → Transcription only (larger model)
-
-### 🎥 YouTube Summary & Download
-- Send a YouTube link → Bot downloads, transcribes and summarizes (Default)
-- Send link + "download" → Bot sends you the video file
-
-### 🐦 Twitter/X Media Download
-- Send a Twitter/X link and ask to "download" or "bajar"
-- The bot will download the video/image and send the file to you
-
-### 📦 File Upload (Catbox.moe)
-- **Direct Upload**: Send a photo or video with the message "upload to catbox" or "give me the link".
-- **Reply**: Reply to any image or video (yours or the bot's) with "upload this" and the bot will return a permanent direct link.
-
-### 🔍 Smart Image Search
-- Ask: "Give me a photo of [something]" or "Search for an image of [something]"
-- The **LLM decides** to search for an image and uses the command `:::foto...:::`.
-- The bot searches Brave Images, then uses its **Vision Model** to look at the candidates.
-- It only sends the image if the AI confirms it matches your request!
-
-### 🧮 Math Solver
-- **Automatic Detection**: Ask any math problem (algebra, calculus, matrices, etc.).
-- The bot detects the intent and automatically switches to a **Specialized Math Model** (configured in `config.yaml`).
-- **Formatted Response**: You receive a step-by-step solution with perfect **LaTeX** rendering in Telegram.
-- **Examples:**
-  - "Solve the integral of x^2 dx"
-  - "Find the roots of 2x^2 + 5x - 3 = 0"
-  - "Calculate the eigenvalues of the matrix..."
-
-### 📄 Document Reading & OCR
-- Send a PDF, DOCX, or TXT file → Bot extracts text and responds.
-- **Automatic OCR**: If the document is scanned (text density < 15 words/page), the bot automatically:
-  1. Converts pages to high-res images.
-  2. Uses the Vision Model (`glm-4v` by default) to read the content.
-  3. Formats **Mathematical Formulas** (LaTeX) into readable text (e.g., converts `$x^2$` to `x²`).
-- **Math Support**: Detects and beautifully renders complex math formulas from academic papers.
-- Send document + caption → Bot considers both for response.
-
-### ⏰ Reminders
-Ask the bot things like:
-- "Remind me to drink water every hour"
-- "Notify me tomorrow at 9am about my meeting"
-
-### 🧠 Vector Memory (RAG)
-The bot uses a local vector database (ChromaDB) to remember facts and conversations.
-
-**To learn new things:**
-- Just tell it: *"My mom is Jessica"* → Auto-saved if deemed important.
-- Force save: `:::memory Data to save:::`
-
-**To forget:**
-- `:::memory_delete Data to forget:::`
-- Detects the most similar memory (>85% match) and deletes it.
-
-**To view usage:**
-- Look for **"🧠 RAG..."** status when the bot is searching its memory.
-
-
-### 📧 Email Digest (Optional)
-If Gmail is configured, the bot will:
-- Run at 4:00 AM daily
-- Read emails from the last 24 hours
-- Use LLM to identify important emails
-- Send you a summary on Telegram
-
-### 💡 Smart Lights (Optional)
-Control WIZ lights via natural language:
-- "Turn off the bedroom lights"
-- "Set brightness to 50%"
-- "Change color to red"
-- "Turn off all lights"
-
-**Configuration** in `config.yaml`:
-```yaml
-WIZ_LIGHTS:
-  bedroom:  # Single light
-    - "192.168.0.121"
-  living:   # Multiple lights (group)
-    - "192.168.0.63"
-    - "192.168.0.115"
+```
+┌─────────────────────────────────────────────┐
+│         User Interfaces                     │
+│  ┌──────────────┐    ┌─────────────────┐    │
+│  │   Telegram   │    │   TUI (Textual) │    │
+│  │    Bot       │    │   (Terminal)    │    │
+│  └──────┬───────┘    └────────┬──────── ┘   │
+└─────────┼─────────────────────┼─────────────┘
+          │                     │
+          └──────────┬──────────┘
+                     │
+┌────────────────────┴────────────────────────┐
+│          Message Processing Layer           │
+│  - Queue-based sequential processing        │
+│  - Command parsing (:::command:::)          │
+│  - Media handling (voice, photo, docs)      │
+└────────────────────┬────────────────────────┘
+                     │
+┌────────────────────┴────────────────────────┐
+│          LLM Integration (Ollama)           │
+│  - Streaming chat API                       │
+│  - Vision model for image analysis          │
+│  - Context management with pruning          │
+└────────────────────┬────────────────────────┘
+                     │
+┌────────────────────┴────────────────────────┐
+│           Utility Services                  │
+│  ┌─────────┐ ┌─────────┐ ┌─────────────┐    │
+│  │ Whisper │ │  Brave  │ │  YouTube    │    │
+│  │(Speech) │ │ Search  │ │  Download   │    │
+│  └─────────┘ └─────────┘ └─────────────┘    │
+│  ┌─────────┐ ┌─────────┐ ┌─────────────┐    │
+│  │  WIZ    │ │  Cron   │ │  Gmail      │    │
+│  │ Lights  │ │ Jobs    │ │  IMAP       │    │
+│  └─────────┘ └─────────┘ └─────────────┘    │
+│  ┌─────────┐ ┌─────────┐ ┌─────────────┐    │
+│  │   OCR   │ │  Math   │ │  Catbox     │    │
+│  │ Service │ │ Solver  │ │  Uploads    │    │
+│  └─────────┘ └─────────┘ └─────────────┘    │
+│  ┌─────────┐ ┌─────────┐ ┌─────────────┐    │
+│  │   RAG   │ │  Docs   │ │  Calendar   │    │
+│  │ System  │ │ Reader  │ │   Events    │    │
+│  └─────────┘ └─────────┘ └─────────────┘    │
+└─────────────────────────────────────────────┘
 ```
 
-**Requires**: `pip install pywizlight`
-
-### 🧠 Deep Research
-- **Command**: `/deep <topic>`
-- **Function**: Performs an iterative research process on the given topic.
-- **Process**:
-  1.  Analyzes the topic and decides on search queries.
-  2.  Uses **Brave Search** to gather information.
-  3.  Summarizes findings and repeats the process (up to 5 iterations).
-  4.  Generates a comprehensive **ODT Report** (OpenDocument Text).
-  5.  Sends the report to you via Telegram.
-
-## 🔧 Development
-
-### Architecture
-The project uses a modular architecture:
-- **Handlers**: Separate modules for different message types
-- **Jobs**: Background tasks (cleanup, notifications)
-- **State**: Thread-safe chat history management
-- **Middleware**: Rate limiting and other cross-cutting concerns
-
-See `docs/architecture.md` for detailed information.
-
-### Adding new features
-1. Create the module in `utils/`
-2. Import it in appropriate handler
-3. Add instructions in `data/instructions.md`
-
-### Changing model
-Edit `config.yaml`:
-```yaml
-MODEL: "your-model:tag"
-```
 
 ## 🐛 Troubleshooting
 
