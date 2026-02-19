@@ -279,9 +279,3 @@ echo -e "\n${GREEN}=== Installation Complete! ===${NC}"
 echo -e "To start the bot manually, run: ${CYAN}./run.sh${NC}"
 echo -e "Or if you installed the CLI: ${CYAN}femtobot start${NC}"
 echo -e "Remember to edit your ${YELLOW}.env${NC} file with your Telegram token!"
-
-# Detect Shell for activation tip
-if [[ "$SHELL" == *"fish"* ]] || [ -n "$FISH_VERSION" ]; then
-    echo -e "\n${CYAN}Fish Shell Detected:${NC}"
-    echo -e "To activate the environment manually, use: ${GREEN}source venv_bot/bin/activate.fish${NC}"
-fi
