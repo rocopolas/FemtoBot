@@ -38,7 +38,26 @@ install_pkg() {
                  return 1
             fi
         fi
-    elif [ -x "$(command -v brew)" ]; then
+    elif [ -x "$(command -v pacman)" ]; then
+        if sudo -n true 2>/dev/null; then
+            echo -e "${YELLOW}Installing $PACKAGE...${NC}"
+            sudo pacman -S --noconfirm "$PACKAGE"
+        else
+             # Check if interactive
+            if [ -t 0 ]; then
+                read -p "Do you want to run sudo to install $PACKAGE? (y/N) " -n 1 -r
+                echo
+                if [[ $REPLY =~ ^[Yy]$ ]]; then
+                    sudo pacman -S --noconfirm "$PACKAGE"
+                else
+                    echo -e "${RED}Skipping $PACKAGE installation. Please install it manually.${NC}"
+                    return 1
+                fi
+            else
+                 echo -e "${RED}Cannot install $PACKAGE automatically (no sudo access).${NC}"
+                 return 1
+            fi
+        fi
         echo -e "${YELLOW}Installing $PACKAGE...${NC}"
         brew install "$PACKAGE"
     else
@@ -49,17 +68,24 @@ install_pkg() {
 
 PYTHON_EXEC=""
 check_python_version() {
-    # Check python3 first
-    if command -v python3 >/dev/null 2>&1; then
-        if python3 -c "import sys; exit(0 if sys.version_info >= (3, 12) else 1)" 2>/dev/null; then
-            PYTHON_EXEC="python3"
-            return 0
-        fi
-    fi
-    # Check python3.12 explicit
+    # 1. Try python3.12 explicitly (Preferred)
     if command -v python3.12 >/dev/null 2>&1; then
         PYTHON_EXEC="python3.12"
         return 0
+    fi
+    # 2. Try python3.13 explicitly
+    if command -v python3.13 >/dev/null 2>&1; then
+         PYTHON_EXEC="python3.13"
+         return 0
+    fi
+
+    # 3. Try python3, but check if it is compatible (>= 3.12 AND < 3.14)
+    # Python 3.14 breaks pydantic v1 used by chromadb
+    if command -v python3 >/dev/null 2>&1; then
+        if python3 -c "import sys; exit(0 if (3, 12) <= sys.version_info < (3, 14) else 1)" 2>/dev/null; then
+            PYTHON_EXEC="python3"
+            return 0
+        fi
     fi
     return 1
 }
@@ -103,19 +129,33 @@ echo -e "\n${CYAN}[1/6] Checking system dependencies...${NC}"
 if check_python_version; then
     echo -e "${GREEN}✓ Python $($PYTHON_EXEC --version) found${NC}"
 else
-    echo -e "${YELLOW}Python 3.12+ not found. Attempting to install Python 3.12...${NC}"
+    echo -e "${YELLOW}Compatible Python (3.12 - 3.13) not found.${NC}"
+    echo -e "${YELLOW}Python 3.14+ is currently not supported due to dependency issues.${NC}"
+    echo "Attempting to install Python 3.12..."
+    
     # Check if we can install it via deadsnakes (Ubuntu) or similar
     if [ -x "$(command -v apt-get)" ]; then
         echo "Adding deadsnakes PPA and installing Python 3.12..."
-        # sudo handling for PPA? install_pkg doesn't handle PPA command
-        # Simplify to install_pkg first if package exists
+        # We can't easily auto-add PPA without potential interactions/sudo issues, 
+        # but let's try the simple install first.
         install_pkg python3.12
+    elif [ -x "$(command -v pacman)" ]; then
+        # Arch Linux
+        echo "Trying to install python3.12 on Arch..."
+        # On Arch, python3.12 is often in AUR or 'python312' if using specific repos
+        # Try 'python312' binary package if exists, or warn user.
+        if ! install_pkg python312; then
+             echo -e "${RED}Could not install python3.12 automatically via pacman.${NC}"
+             echo -e "${YELLOW}Please install Python 3.12 manually (e.g., from AUR or build from source).${NC}"
+             exit 1
+        fi
     else
         install_pkg python3.12
     fi
     
     if ! check_cmd python3.12; then
-        echo -e "${RED}Failed to install Python 3.12. Please install it manually.${NC}"
+        echo -e "${RED}Failed to find or install Python 3.12.${NC}"
+        echo -e "${YELLOW}Please install Python 3.12 manually and try again.${NC}"
         exit 1
     fi
     PYTHON_EXEC="python3.12"
@@ -231,7 +271,17 @@ fi
 # Run doctor
 femtobot doctor
 
+# 7. Initial Setup
+echo -e "\n${CYAN}[7/7] Running initial setup...${NC}"
+femtobot setup
+
 echo -e "\n${GREEN}=== Installation Complete! ===${NC}"
 echo -e "To start the bot manually, run: ${CYAN}./run.sh${NC}"
 echo -e "Or if you installed the CLI: ${CYAN}femtobot start${NC}"
 echo -e "Remember to edit your ${YELLOW}.env${NC} file with your Telegram token!"
+
+# Detect Shell for activation tip
+if [[ "$SHELL" == *"fish"* ]] || [ -n "$FISH_VERSION" ]; then
+    echo -e "\n${CYAN}Fish Shell Detected:${NC}"
+    echo -e "To activate the environment manually, use: ${GREEN}source venv_bot/bin/activate.fish${NC}"
+fi

@@ -34,7 +34,7 @@ A smart personal assistant designed for small local models, recommended for GPUs
 
 FemtoBot is designed to be easy to install and runs entirely locally. You can use the automated setup script or install it manually.
 
-### ⚡ Option 1: Automated Installation (Recommended)
+### ⚡ Automated Installation
 
 This is the fastest way to get started. Just copy and run this command:
 
@@ -176,13 +176,13 @@ FEATURES:
 
 ### Telegram Bot
 ```bash
-./run.sh
+femtobot start
 ```
+(Or use `./run.sh` if you prefer the script)
 
 ### TUI Interface
 ```bash
-source venv_bot/bin/activate
-python src/main.py
+femtobot tui
 ```
 
 **TUI Features:**
@@ -203,18 +203,6 @@ python src/main.py
 /export [file]  - Export to markdown file
 /unload         - Unload models from RAM
 /help           - Show all commands
-```
-
-### Running Tests
-```bash
-# Install test dependencies
-pip install pytest pytest-asyncio pytest-cov
-
-# Run all tests
-pytest tests/ -v
-
-# With coverage
-pytest tests/ --cov=src --cov=utils
 ```
 
 ## 📱 Telegram Commands
