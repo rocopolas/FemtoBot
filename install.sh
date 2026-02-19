@@ -142,12 +142,18 @@ else
     elif [ -x "$(command -v pacman)" ]; then
         # Arch Linux
         echo "Trying to install python3.12 on Arch..."
-        # On Arch, python3.12 is often in AUR or 'python312' if using specific repos
-        # Try 'python312' binary package if exists, or warn user.
-        if ! install_pkg python312; then
-             echo -e "${RED}Could not install python3.12 automatically via pacman.${NC}"
-             echo -e "${YELLOW}Please install Python 3.12 manually (e.g., from AUR or build from source).${NC}"
-             exit 1
+        
+        if command -v yay >/dev/null 2>&1; then
+             echo -e "${YELLOW}Using yay to install python312...${NC}"
+             yay -S --noconfirm python312
+        else
+             # Try 'python312' via pacman if yay is missing
+             echo -e "${YELLOW}yay not found. Trying pacman...${NC}"
+             if ! install_pkg python312; then
+                 echo -e "${RED}Could not install python3.12 automatically via pacman.${NC}"
+                 echo -e "${YELLOW}Please install Python 3.12 manually (e.g., from AUR).${NC}"
+                 exit 1
+             fi
         fi
     else
         install_pkg python3.12
@@ -270,6 +276,8 @@ fi
 
 # Run doctor
 femtobot doctor
+
+femtobot wizard
 
 # 7. Initial Setup
 echo -e "\n${CYAN}[7/7] Running initial setup...${NC}"
