@@ -277,11 +277,12 @@ fi
 # Run doctor
 femtobot doctor
 
-femtobot wizard
-
 # 7. Initial Setup
 echo -e "\n${CYAN}[7/7] Running initial setup...${NC}"
 femtobot setup
+
+femtobot wizard
+
 
 echo -e "\n${GREEN}=== Installation Complete! ===${NC}"
 echo -e "To start the bot manually, run: ${CYAN}./run.sh${NC}"
