@@ -78,7 +78,9 @@ class DocumentHandler:
             
             # OCR Fallback
             if needs_ocr and doc_type == "PDF":
-                ocr_model = get_config("OCR_MODEL", "glm-4v")
+                ocr_model = get_config("OCR_MODEL")
+                if not ocr_model:
+                    ocr_model = get_config("VISION_MODEL") or self.model
                 await status_msg.edit_text(f"👁️ Scanned document detected. Starting OCR with {ocr_model}...")
                 try:
                     images_b64 = await asyncio.to_thread(convert_pdf_to_images, tmp_path)

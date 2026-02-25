@@ -260,12 +260,10 @@ def format_bot_response(response: str) -> str:
     
     formatted = response
     
-    # Handle think tags - format as quotes or remove
-    if "<think>" in formatted:
-        formatted = formatted.replace("<think>", "> 🧠 **Thinking:**\n> ")
-        formatted = formatted.replace("</think>", "\n\n")
-        # Remove any remaining think content
-        formatted = re.sub(r'<think>.*?</think>', '', formatted, flags=re.DOTALL)
+    # Strip thinking tags completely (e.g. Qwen3 <think>...</think>)
+    formatted = re.sub(r'<think>.*?</think>', '', formatted, flags=re.DOTALL)
+    # Handle unclosed <think> tag (model still thinking at end of response)
+    formatted = re.sub(r'<think>.*', '', formatted, flags=re.DOTALL)
     
     # Remove ANSI color codes
     formatted = re.sub(r'\x1b\[[0-9;]*m', '', formatted)

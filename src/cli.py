@@ -685,53 +685,75 @@ def setup():
     except Exception as e:
         click.secho(f"  ⚠ Failed to ensure data files: {e}", fg=YELLOW)
 
+    # Detect backend provider
+    backend_cfg = cfg.get("BACKEND", {})
+    provider = (backend_cfg.get("PROVIDER", "ollama") if isinstance(backend_cfg, dict) else "ollama").lower()
+
     # Collect model names from config
     model_keys = ["MODEL", "VISION_MODEL", "MATH_MODEL", "OCR_MODEL"]
     rag_config = cfg.get("RAG", {})
-    models = []
-
+    
+    # Chat/vision/math/OCR models
+    chat_models = []
     for key in model_keys:
         val = cfg.get(key)
         if val:
-            models.append((key, val))
+            chat_models.append((key, val))
 
+    # Embedding model (always Ollama)
     embed_model = rag_config.get("EMBEDDING_MODEL")
-    if embed_model:
-        models.append(("EMBEDDING_MODEL", embed_model))
 
-    if not models:
-        click.secho("No models found in config.yaml", fg=YELLOW)
-        return
+    if provider == "lmstudio":
+        # ── LM Studio mode ──
+        click.secho("\n=== Backend: LM Studio ===\n", fg=CYAN, bold=True)
+        
+        all_models = chat_models[:]
+        if embed_model:
+            all_models.append(("EMBEDDING_MODEL", embed_model))
+        
+        if all_models:
+            click.secho("  ℹ The following models must be downloaded from the LM Studio GUI:", fg=YELLOW)
+            for key, model_name in all_models:
+                click.secho(f"    • {key}: {model_name}", fg=YELLOW)
+            click.echo()
+    else:
+        # ── Ollama mode (original logic) ──
+        models = chat_models[:]
+        if embed_model:
+            models.append(("EMBEDDING_MODEL", embed_model))
 
-    # Check Ollama
-    if not _check_ollama():
-        click.secho("✗ Ollama is not running.", fg=RED)
-        click.secho("  Please start Ollama (e.g. 'ollama serve') and RUN 'femtobot setup' AGAIN to download models.", fg=YELLOW)
-        return
+        if not models:
+            click.secho("No models found in config.yaml", fg=YELLOW)
+            return
 
-    # Get already-downloaded models
-    try:
-        import httpx
-        r = httpx.get("http://localhost:11434/api/tags", timeout=5)
-        existing = {m["name"] for m in r.json().get("models", [])}
-    except Exception:
-        existing = set()
+        if not _check_ollama():
+            click.secho("✗ Ollama is not running.", fg=RED)
+            click.secho("  Please start Ollama (e.g. 'ollama serve') and RUN 'femtobot setup' AGAIN to download models.", fg=YELLOW)
+            return
 
-    click.secho("\n=== Downloading Models ===\n", fg=CYAN, bold=True)
+        # Get already-downloaded models
+        try:
+            import httpx
+            r = httpx.get("http://localhost:11434/api/tags", timeout=5)
+            existing = {m["name"] for m in r.json().get("models", [])}
+        except Exception:
+            existing = set()
 
-    for key, model_name in models:
-        if model_name in existing:
-            click.secho(f"  ✓ {key}: {model_name} (already downloaded)", fg=GREEN)
-        else:
-            click.secho(f"  ⬇ {key}: {model_name} — pulling...", fg=CYAN)
-            result = subprocess.run(
-                ["ollama", "pull", model_name],
-                capture_output=False,
-            )
-            if result.returncode == 0:
-                click.secho(f"  ✓ {model_name} downloaded", fg=GREEN)
+        click.secho("\n=== Downloading Models ===\n", fg=CYAN, bold=True)
+
+        for key, model_name in models:
+            if model_name in existing:
+                click.secho(f"  ✓ {key}: {model_name} (already downloaded)", fg=GREEN)
             else:
-                click.secho(f"  ✗ Failed to pull {model_name}", fg=RED)
+                click.secho(f"  ⬇ {key}: {model_name} — pulling...", fg=CYAN)
+                result = subprocess.run(
+                    ["ollama", "pull", model_name],
+                    capture_output=False,
+                )
+                if result.returncode == 0:
+                    click.secho(f"  ✓ {model_name} downloaded", fg=GREEN)
+                else:
+                    click.secho(f"  ✗ Failed to pull {model_name}", fg=RED)
 
     click.echo()
     click.secho("✓ Setup complete! Run 'femtobot start' to launch the bot.", fg=GREEN, bold=True)
@@ -1423,48 +1445,70 @@ def doctor():
         click.secho(f"  ✗ data/ missing or not writable ({data_dir})", fg=RED)
         issues += 1
 
-    # 5. Environment variables (This section is now redundant due to .env check above, removing it)
-    # 6. Ollama
-    if _check_ollama():
-        click.secho("\n  ✓ Ollama running", fg=GREEN)
-        
-        # Check models
-        models = [
-            ("MODEL", cfg.get("MODEL")),
-            ("VISION_MODEL", cfg.get("VISION_MODEL")),
-            ("MATH_MODEL", cfg.get("MATH_MODEL")),
-            ("OCR_MODEL", cfg.get("RAG", {}).get("OCR_MODEL", "glm-ocr:latest")),
-            ("EMBEDDING", cfg.get("RAG", {}).get("EMBEDDING_MODEL"))
-        ]
-        
-        available_models = []
+    # 5. Backend connectivity
+    backend_cfg = cfg.get("BACKEND", {})
+    provider = backend_cfg.get("PROVIDER", "ollama").lower() if isinstance(backend_cfg, dict) else "ollama"
+    ollama_url = backend_cfg.get("OLLAMA_URL", "http://localhost:11434") if isinstance(backend_cfg, dict) else "http://localhost:11434"
+    lmstudio_url = backend_cfg.get("LMSTUDIO_URL", "http://localhost:1234") if isinstance(backend_cfg, dict) else "http://localhost:1234"
+    
+    click.secho(f"\n  Backend: {provider}", fg=CYAN, bold=True)
+    
+    if provider == "lmstudio":
+        # Check LM Studio
         try:
             import httpx
-            resp = httpx.get("http://localhost:11434/api/tags", timeout=2.0)
-            if resp.status_code == 200:
-                data = resp.json()
-                available_models = [m["name"] for m in data.get("models", [])]
-        except:
-             pass
-            
-        for name, model_name in models:
-            if not model_name: continue
-            
-            # Simple check if model string is in available tags
-            found = False
-            for avail in available_models:
-                if model_name in avail:
-                    found = True
-                    break
-            
-            if found:
-                click.secho(f"  ✓ {name}: {model_name} found", fg=GREEN)
+            r = httpx.get(f"{lmstudio_url}/v1/models", timeout=3)
+            if r.status_code == 200:
+                click.secho(f"  ✓ LM Studio running at {lmstudio_url}", fg=GREEN)
+                models_data = r.json().get("data", [])
+                if models_data:
+                    for m in models_data:
+                        click.secho(f"    • {m.get('id', 'unknown')}", fg=GREEN)
+                else:
+                    click.secho("    ⚠ No models loaded in LM Studio", fg=YELLOW)
             else:
-                click.secho(f"  ✗ {name}: {model_name} (not downloaded — run 'femtobot setup')", fg=RED)
+                click.secho(f"  ✗ LM Studio returned status {r.status_code}", fg=RED)
                 issues += 1
+        except Exception:
+            click.secho(f"  ✗ LM Studio not reachable at {lmstudio_url}", fg=RED)
+            issues += 1
     else:
-        click.secho("  ✗ Ollama not running", fg=RED)
-        issues += 1
+        # Ollama mode (original logic)
+        if _check_ollama():
+            click.secho(f"  ✓ Ollama running at {ollama_url}", fg=GREEN)
+            
+            # Check models
+            models = [
+                ("MODEL", cfg.get("MODEL")),
+                ("VISION_MODEL", cfg.get("VISION_MODEL")),
+                ("MATH_MODEL", cfg.get("MATH_MODEL")),
+                ("OCR_MODEL", cfg.get("OCR_MODEL")),
+                ("EMBEDDING", cfg.get("RAG", {}).get("EMBEDDING_MODEL"))
+            ]
+            
+            available_models = []
+            try:
+                import httpx
+                resp = httpx.get(f"{ollama_url}/api/tags", timeout=2.0)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    available_models = [m["name"] for m in data.get("models", [])]
+            except:
+                 pass
+                
+            for name, model_name in models:
+                if not model_name: continue
+                
+                found = any(model_name in avail for avail in available_models)
+                
+                if found:
+                    click.secho(f"  ✓ {name}: {model_name} found", fg=GREEN)
+                else:
+                    click.secho(f"  ✗ {name}: {model_name} (not downloaded — run 'femtobot setup')", fg=RED)
+                    issues += 1
+        else:
+            click.secho(f"  ✗ Ollama not running at {ollama_url}", fg=RED)
+            issues += 1
 
     # 7. FFmpeg
     click.echo()

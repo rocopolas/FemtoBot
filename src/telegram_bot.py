@@ -305,14 +305,28 @@ def _validate_startup():
     if not AUTHORIZED_USERS:
         errors.append("AUTHORIZED_USERS is empty — no one will be able to use the bot")
     
-    # Check Ollama connectivity
+    # Check backend connectivity
+    backend_cfg = get_config("BACKEND") or {}
+    provider = (backend_cfg.get("PROVIDER", "ollama") if isinstance(backend_cfg, dict) else "ollama").lower()
+    ollama_url = backend_cfg.get("OLLAMA_URL", "http://localhost:11434") if isinstance(backend_cfg, dict) else "http://localhost:11434"
+    lmstudio_url = backend_cfg.get("LMSTUDIO_URL", "http://localhost:1234") if isinstance(backend_cfg, dict) else "http://localhost:1234"
+    
     try:
         import httpx
-        r = httpx.get("http://localhost:11434/api/tags", timeout=3)
-        if r.status_code != 200:
-            errors.append("Ollama returned non-200 status")
+        if provider == "lmstudio":
+            # Check LM Studio
+            r = httpx.get(f"{lmstudio_url}/v1/models", timeout=3)
+            if r.status_code != 200:
+                errors.append(f"LM Studio returned non-200 status at {lmstudio_url}")
+        else:
+            r = httpx.get(f"{ollama_url}/api/tags", timeout=3)
+            if r.status_code != 200:
+                errors.append("Ollama returned non-200 status")
     except Exception:
-        errors.append("Ollama is not reachable at localhost:11434 — run 'ollama serve'")
+        if provider == "lmstudio":
+            errors.append(f"LM Studio is not reachable at {lmstudio_url} — make sure it is running")
+        else:
+            errors.append(f"Ollama is not reachable at {ollama_url} — run 'ollama serve'")
     
     if errors:
         print("\n❌ FemtoBot startup failed:\n")
@@ -320,6 +334,8 @@ def _validate_startup():
             print(f"  • {err}")
         print("\n💡 Run 'femtobot doctor' for a full diagnostic.\n")
         sys.exit(1)
+    else:
+        logger.info(f"Backend: {provider} ({lmstudio_url if provider == 'lmstudio' else ollama_url})")
 
 
 def main():

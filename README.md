@@ -1,7 +1,7 @@
 
 ![FemtoBot Logo](https://files.catbox.moe/zhkn08.jpg)
 
-A smart personal assistant designed for small local models, recommended for GPUs with at least 8GB of VRAM. Runs locally using [Ollama](https://ollama.ai). Available as a Telegram bot and TUI interface.
+A smart personal assistant designed for small local models, recommended for GPUs with at least 8GB of VRAM. Runs locally using [Ollama](https://ollama.ai) or [LM Studio](https://lmstudio.ai/). Available as a Telegram bot and TUI interface.
 
 ## ✨ Features
 
@@ -147,8 +147,17 @@ GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
 
 ### `config.yaml`
 ```yaml
+# Backend Configuration
+BACKEND:
+  PROVIDER: "ollama"           # Use "ollama" or "lmstudio"
+  OLLAMA_URL: "http://localhost:11434"
+  LMSTUDIO_URL: "http://localhost:1234"
+
+# Models
 MODEL: "llama3.1:latest"
-VISION_MODEL: "qwen3-vl:2b"
+VISION_MODEL: "qwen3-vl:2b"    # Leave blank to use main model
+MATH_MODEL: "qwen2-math:7b"
+OCR_MODEL: "glm-ocr:latest"    # Leave blank to use vision/main model
 CONTEXT_LIMIT: 200000
 WHISPER_LANGUAGE: "en"
 WHISPER_MODEL_VOICE: "base"

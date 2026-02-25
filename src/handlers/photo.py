@@ -113,29 +113,28 @@ class PhotoHandler:
             
             # --- Step 1: OCR extraction ---
             ocr_model = get_config("OCR_MODEL")
-            if ocr_model:
-                await status_msg.edit_text(f"👁️ Extracting text with OCR ({ocr_model})...")
-                ocr_text = await client.describe_image(
-                    ocr_model,
-                    image_base64,
-                    "Transcribe ALL text visible in this image exactly as it appears. "
-                    "Output ONLY the raw text, no commentary or descriptions. "
-                    "If there is no text, respond with: NO_TEXT"
-                )
-                
-                # Unload OCR model if different from main
-                if ocr_model != self.model:
-                    await client.unload_model(ocr_model)
-                
-                ocr_text = ocr_text.strip()
-                has_text = (
-                    len(ocr_text) >= _MIN_OCR_LENGTH
-                    and "NO_TEXT" not in ocr_text.upper()
-                    and not ocr_text.startswith("[Error")
-                )
-            else:
-                ocr_text = ""
-                has_text = False
+            if not ocr_model:
+                ocr_model = vision_model
+            
+            await status_msg.edit_text(f"👁️ Extracting text with OCR ({ocr_model})...")
+            ocr_text = await client.describe_image(
+                ocr_model,
+                image_base64,
+                "Transcribe ALL text visible in this image exactly as it appears. "
+                "Output ONLY the raw text, no commentary or descriptions. "
+                "If there is no text, respond with: NO_TEXT"
+            )
+            
+            # Unload OCR model if different from main
+            if ocr_model != self.model:
+                await client.unload_model(ocr_model)
+            
+            ocr_text = ocr_text.strip()
+            has_text = (
+                len(ocr_text) >= _MIN_OCR_LENGTH
+                and "NO_TEXT" not in ocr_text.upper()
+                and not ocr_text.startswith("[Error")
+            )
             
             # --- Step 2: Math detection ---
             if has_text and self._contains_math(ocr_text):
