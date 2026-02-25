@@ -66,86 +66,36 @@ A smart personal assistant designed for small local models, recommended for GPUs
 
 FemtoBot is designed to be easy to install and runs entirely locally. You can use the automated setup script or install it manually.
 
-### 📋 Prerequisites
+### ⚡ Automated Installation
 
-- **Python 3.12** (Strictly required)
-- **Git** needed to clone the repository
-- **[Ollama](https://ollama.ai)** installed and running (`ollama serve`)
-- **FFmpeg** required for audio transcription features
+This is the fastest way to get started. Just copy and run this command:
 
----
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/rocopolas/FemtoBot/main/install.sh)"
+```
 
-### ⚡ Option 1: Automated Installation (Recommended)
+This single command will:
+1.  Download the installation script.
+2.  Clone the repository automatically (if not present).
+3.  Install all system dependnecies (Python, FFmpeg, etc).
+4.  Set up the environment completely.
 
-This is the fastest way to get started. The `run.sh` script handles environment creation and dependencies.
-
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/rocopolas/FemtoBot.git
-    cd FemtoBot
-    ```
-
-2.  **Run the setup script:**
-    ```bash
-    chmod +x run.sh
-    ./run.sh
-    ```
-    This script will:
-    - Check for Python 3.12
-    - Create a virtual environment (`venv_bot`)
-    - Install all required dependencies
-    - specificy `femtobot` command installation
-
-3.  **Install the System-wide CLI (Optional):**
-    To use the `femtobot` command from any terminal:
-    ```bash
-    chmod +x scripts/install_cli.sh
-    sudo ./scripts/install_cli.sh # requires sudo
-    ```
-
----
-
-### 🛠️ Option 2: Manual Installation
-
-If you prefer to configure the environment yourself:
-
-1.  **Clone and enter the directory:**
-    ```bash
-    git clone https://github.com/rocopolas/FemtoBot.git
-    cd FemtoBot
-    ```
-
-2.  **Create and activate virtual environment:**
-    ```bash
-    python3.12 -m venv venv_bot
-    source venv_bot/bin/activate
-    # On Windows: venv_bot\Scripts\activate
-    ```
-
-3.  **Install dependencies:**
-    ```bash
-    pip install --upgrade pip
-    pip install -r requirements.txt
-    ```
-
----
-
-### 🐳 Option 3: Docker
-
-Run FemtoBot and Ollama together using Docker Compose:
-
+Alternatively, you can clone manually:
 ```bash
 git clone https://github.com/rocopolas/FemtoBot.git
 cd FemtoBot
-cp .env.example .env
-# Edit .env with your tokens
-docker compose up -d
+chmod +x install.sh
+./install.sh
 ```
 
-> **Note:** GPU passthrough is configured for NVIDIA GPUs. Edit `docker-compose.yml` if you use a different GPU or CPU-only.
+### 📋 Prerequisites
+
+- **Python 3.12+** (Will be installed automatically if missing on Ubuntu/Debian)
+- **Git**
+- **[Ollama](https://ollama.ai)** (Script will attempt to install)
+- **FFmpeg**
 
 ---
-
 
 ### ⚙️ Initial Configuration
 
@@ -258,13 +208,13 @@ FEATURES:
 
 ### Telegram Bot
 ```bash
-./run.sh
+femtobot start
 ```
+(Or use `./run.sh` if you prefer the script)
 
 ### TUI Interface
 ```bash
-source venv_bot/bin/activate
-python src/main.py
+femtobot tui
 ```
 
 **TUI Features:**
@@ -285,18 +235,6 @@ python src/main.py
 /export [file]  - Export to markdown file
 /unload         - Unload models from RAM
 /help           - Show all commands
-```
-
-### Running Tests
-```bash
-# Install test dependencies
-pip install pytest pytest-asyncio pytest-cov
-
-# Run all tests
-pytest tests/ -v
-
-# With coverage
-pytest tests/ --cov=src --cov=utils
 ```
 
 ## 📱 Telegram Commands

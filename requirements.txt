@@ -6,7 +6,7 @@ python-dotenv
 PyYAML
 faster-whisper
 chromadb
-telegramify-markdown
+telegramify-markdown[mermaid]
 pymupdf
 python-docx
 markdown

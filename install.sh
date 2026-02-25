@@ -182,6 +182,26 @@ else
     echo -e "${GREEN}✓ Git found${NC}"
 fi
 
+# crontab (cron daemon)
+if ! check_cmd crontab; then
+    echo -e "${YELLOW}crontab not found. Installing cron daemon...${NC}"
+    if [ -x "$(command -v apt-get)" ]; then
+        install_pkg cron
+        if check_cmd systemctl; then
+            sudo systemctl enable --now cron 2>/dev/null || echo -e "${YELLOW}Please start cron service manually.${NC}"
+        fi
+    elif [ -x "$(command -v pacman)" ]; then
+        install_pkg cronie
+        if check_cmd systemctl; then
+            sudo systemctl enable --now cronie 2>/dev/null || echo -e "${YELLOW}Please start cronie service manually.${NC}"
+        fi
+    else
+        echo -e "${RED}Please install and enable a cron daemon manually.${NC}"
+    fi
+else
+    echo -e "${GREEN}✓ crontab found${NC}"
+fi
+
 # Ollama
 if ! check_cmd ollama; then
     echo -e "${YELLOW}Ollama not found.${NC}"
