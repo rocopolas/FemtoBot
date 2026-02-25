@@ -6,6 +6,36 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def chunk_text(text: str, chunk_size: int = 1000, chunk_overlap: int = 200) -> list[str]:
+    """Split text into overlapping chunks for RAG."""
+    if not text:
+        return []
+    
+    chunks = []
+    start = 0
+    text_len = len(text)
+    
+    while start < text_len:
+        end = start + chunk_size
+        
+        if end < text_len:
+            last_newline = text.rfind('\n', start, end)
+            last_space = text.rfind(' ', start, end)
+            
+            if last_newline != -1 and last_newline > end - int(chunk_size * 0.2):
+                end = last_newline + 1
+            elif last_space != -1 and last_space > end - int(chunk_size * 0.1):
+                end = last_space + 1
+                
+        chunks.append(text[start:end].strip())
+        start = end - chunk_overlap
+        
+        if start <= 0 or start >= end:
+            start = end # fallback to hard split without overlap if stuck
+            
+    return [c for c in chunks if c]
+
+
 def _extract_text_from_pdf_sync(file_path: str) -> tuple[str, int]:
     """Synchronous PDF text extraction. Returns (text, page_count)."""
     try:

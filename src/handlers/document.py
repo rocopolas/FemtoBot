@@ -13,7 +13,7 @@ from src.state.chat_manager import ChatManager
 from src.middleware.rate_limiter import rate_limit
 from utils.config_loader import get_config
 from utils.telegram_utils import format_bot_response, split_message, prune_history, telegramify_content, send_telegramify_results
-from utils.document_utils import extract_text_from_document, is_supported_document, convert_pdf_to_images
+from utils.document_utils import extract_text_from_document, is_supported_document, convert_pdf_to_images, chunk_text
 
 logger = logging.getLogger(__name__)
 
@@ -120,14 +120,29 @@ class DocumentHandler:
             
             # Index to Vector Store
             from datetime import datetime
-            metadata = {
-                "source": file_name,
-                "type": doc_type,
-                "timestamp": str(datetime.now())
-            }
-            await self.vector_manager.add_document(doc_text, metadata)
             
-            await status_msg.edit_text(f"🧠 Processing and indexing {doc_type} document...")
+            chunk_size = get_config("RAG", {}).get("CHUNK_SIZE", 1000) if isinstance(get_config("RAG"), dict) else 1000
+            chunk_overlap = get_config("RAG", {}).get("CHUNK_OVERLAP", 200) if isinstance(get_config("RAG"), dict) else 200
+            chunks = chunk_text(doc_text, chunk_size, chunk_overlap)
+            
+            await status_msg.edit_text(f"🧠 Indexing {len(chunks)} chunks of {doc_type} document...")
+            
+            timestamp = str(datetime.now())
+            for i, chunk in enumerate(chunks):
+                chunk_meta = {
+                    "source": file_name,
+                    "type": doc_type,
+                    "timestamp": timestamp,
+                    "chunk_id": i
+                }
+                await self.vector_manager.add_document(chunk, chunk_meta)
+                if i > 0 and i % 5 == 0:
+                    try:
+                        await status_msg.edit_text(f"🧠 Indexing chunk {i}/{len(chunks)} of {doc_type} document...")
+                    except Exception:
+                        pass # Ignore if same text
+                        
+            await status_msg.edit_text(f"🧠 Processing {doc_type} document with LLM...")
             
             # Initialize chat history if needed
             history = await self.chat_manager.get_history(chat_id)
