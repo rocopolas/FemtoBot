@@ -14,7 +14,7 @@ from src.client import OllamaClient
 from src.state.chat_manager import ChatManager
 from src.middleware.rate_limiter import rate_limit
 from utils.config_loader import get_config
-from utils.telegram_utils import format_bot_response, split_message, prune_history, telegramify_content, send_telegramify_results
+from utils.telegram_utils import format_bot_response, split_message, prune_history, telegramify_content, send_telegramify_results, stream_to_telegram
 
 logger = logging.getLogger(__name__)
 
@@ -155,9 +155,10 @@ class PhotoHandler:
                 ]
                 math_messages.append({"role": "user", "content": math_prompt})
                 
-                full_response = ""
-                async for chunk in client.stream_chat(math_model, math_messages):
-                    full_response += chunk
+                full_response = await stream_to_telegram(
+                    client.stream_chat(math_model, math_messages),
+                    status_msg
+                )
                 
                 # Unload math model
                 if math_model != self.model:
@@ -233,9 +234,10 @@ class PhotoHandler:
             history = await self.chat_manager.get_history(chat_id)
             
             # Generate response
-            full_response = ""
-            async for chunk in client.stream_chat(self.model, prune_history(history, get_config("CONTEXT_LIMIT", 30000))):
-                full_response += chunk
+            full_response = await stream_to_telegram(
+                client.stream_chat(self.model, prune_history(history, get_config("CONTEXT_LIMIT", 30000))),
+                status_msg
+            )
             
             # Format response
             formatted_response = format_bot_response(full_response)

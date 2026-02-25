@@ -12,7 +12,7 @@ from src.client import OllamaClient
 from src.state.chat_manager import ChatManager
 from src.middleware.rate_limiter import rate_limit
 from utils.config_loader import get_config
-from utils.telegram_utils import format_bot_response, split_message, prune_history, telegramify_content, send_telegramify_results
+from utils.telegram_utils import format_bot_response, split_message, prune_history, telegramify_content, send_telegramify_results, stream_to_telegram
 from utils.document_utils import extract_text_from_document, is_supported_document, convert_pdf_to_images, chunk_text
 
 logger = logging.getLogger(__name__)
@@ -166,9 +166,10 @@ class DocumentHandler:
             
             # Generate response
             client = OllamaClient()
-            full_response = ""
-            async for chunk in client.stream_chat(self.model, prune_history(history, get_config("CONTEXT_LIMIT", 30000))):
-                full_response += chunk
+            full_response = await stream_to_telegram(
+                client.stream_chat(self.model, prune_history(history, get_config("CONTEXT_LIMIT", 30000))),
+                status_msg
+            )
             
             # Format response (clean text)
             cleaned_text = format_bot_response(full_response)

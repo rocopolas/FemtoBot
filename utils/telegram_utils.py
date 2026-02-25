@@ -1,8 +1,63 @@
 import re
+import time
 import logging
-from typing import List
+from typing import List, AsyncGenerator
 
 logger = logging.getLogger(__name__)
+
+# ── Regex patterns for live preview cleanup ─────────────────────────
+_THINK_CLOSED_RE = re.compile(r'<think>.*?</think>', re.DOTALL)
+_THINK_OPEN_RE = re.compile(r'<think>.*', re.DOTALL)
+_COMMAND_RE = re.compile(r':::\w+(?::)?\s*.*?:::', re.DOTALL)
+
+# Telegram message char limit
+_TG_MAX_LEN = 4000
+
+
+def _clean_preview(text: str) -> str:
+    """Strip command tokens for live preview (thinking tags are shown)."""
+    text = _COMMAND_RE.sub('', text)
+    return text.strip()
+
+
+async def stream_to_telegram(
+    stream: AsyncGenerator[str, None],
+    message,
+    interval: float = 1.0,
+) -> str:
+    """
+    Consume an LLM streaming generator while updating a Telegram message
+    with a live preview every `interval` seconds.
+
+    Args:
+        stream: async generator yielding text chunks (from OllamaClient.stream_chat)
+        message: Telegram Message object to edit in-place
+        interval: seconds between edits (default 1.0)
+
+    Returns:
+        The complete raw response string (un-cleaned, for post-processing).
+    """
+    full_response = ""
+    last_edit = 0.0
+    last_preview = ""
+
+    async for chunk in stream:
+        full_response += chunk
+        now = time.monotonic()
+
+        if now - last_edit >= interval:
+            preview = _clean_preview(full_response)
+            if preview and preview != last_preview:
+                # Truncate for Telegram limit, add cursor
+                display = preview[:_TG_MAX_LEN] + " ▌"
+                try:
+                    await message.edit_text(display)
+                except Exception:
+                    pass  # Rate limit, same content, or bot shutting down
+                last_preview = preview
+                last_edit = now
+
+    return full_response
 
 
 async def telegramify_content(text: str, max_length: int = 4090):

@@ -27,7 +27,7 @@ from src.services.upload_service import UploadService
 
 from utils.cron_utils import CronUtils
 from utils.config_loader import get_config, is_feature_enabled
-from utils.telegram_utils import split_message, format_bot_response, prune_history, telegramify_content, send_telegramify_results
+from utils.telegram_utils import split_message, format_bot_response, prune_history, telegramify_content, send_telegramify_results, stream_to_telegram
 from utils.search_utils import BraveSearch
 
 logger = logging.getLogger(__name__)
@@ -141,9 +141,10 @@ class MessageProcessor:
             
             pruned_history = prune_history(history, context_limit)
             
-            full_response = ""
-            async for chunk in self.ollama_client.stream_chat(model, pruned_history):
-                full_response += chunk
+            full_response = await stream_to_telegram(
+                self.ollama_client.stream_chat(model, pruned_history),
+                placeholder_msg
+            )
             
             # 5. Handle Specialized Commands (Math / Search) within LLM response
             full_response = await self._post_process_llm_response(
@@ -340,9 +341,10 @@ class MessageProcessor:
             else:
                  math_messages.append({"role": "user", "content": original_user_text})
             
-            math_response = ""
-            async for chunk in self.ollama_client.stream_chat(math_model, math_messages):
-                math_response += chunk
+            math_response = await stream_to_telegram(
+                self.ollama_client.stream_chat(math_model, math_messages),
+                placeholder_msg
+            )
             
             await self.ollama_client.unload_model(math_model)
             return math_response
@@ -363,14 +365,13 @@ class MessageProcessor:
             })
             
             # Re-query LLM with search results
-            final_response = ""
             history = await self.chat_manager.get_history(chat_id)
             model = get_config("MODEL")
-            
-            # Prune again? yes
             context_limit = get_config("CONTEXT_LIMIT", 30000)
-            async for chunk in self.ollama_client.stream_chat(model, prune_history(history, context_limit)):
-                final_response += chunk
+            final_response = await stream_to_telegram(
+                self.ollama_client.stream_chat(model, prune_history(history, context_limit)),
+                placeholder_msg
+            )
                 
             return final_response
             
