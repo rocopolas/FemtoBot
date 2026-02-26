@@ -179,10 +179,7 @@ def load_instructions():
 
 def get_system_prompt():
     """Get system instructions."""
-    global system_instructions
-    prompt = system_instructions if system_instructions else ""
-    logger.info(f"== DEBUG SYSTEM PROMPT LENGTH: {len(prompt)} ==")
-    return prompt
+    return system_instructions if system_instructions else ""
 
 def update_activity():
     """Update last activity timestamp."""
