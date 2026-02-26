@@ -25,6 +25,10 @@ class CommandService:
         Process commands embedded in LLM response.
         Returns True if any commands were processed.
         """
+        # Strip thinking tags to prevent executing commands from within <think> blocks
+        response_text = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL)
+        response_text = re.sub(r'<think>.*', '', response_text, flags=re.DOTALL)
+        
         commands_processed = False
         
         # 1. Cron Delete

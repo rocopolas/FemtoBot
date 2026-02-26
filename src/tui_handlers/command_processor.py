@@ -20,13 +20,13 @@ class TUICommandProcessor:
     
     # Pre-compiled patterns
     PATTERNS = {
-        'memory': re.compile(r':::memory(?!_delete)\s+(.+?):::', re.DOTALL),
-        'memory_delete': re.compile(r':::memory_delete\s+(.+?):::', re.DOTALL),
-        'cron': re.compile(r':::cron\s+(.+?):::', re.DOTALL),
-        'cron_delete': re.compile(r':::cron_delete\s+(.+?):::'),
-        'search': re.compile(r':::search\s+(.+?):::'),
-        'foto': re.compile(r':::foto\s+(.+?):::', re.IGNORECASE),
-        'luz': re.compile(r':::luz\s+(\S+)\s+(\S+)(?:\s+(\S+))?:::'),
+        'memory': re.compile(r':::memory(?!_delete):*\s*(.+?):::', re.DOTALL),
+        'memory_delete': re.compile(r':::memory_delete:*\s*(.+?):::', re.DOTALL),
+        'cron': re.compile(r':::cron(?!_delete):*\s*(.+?):::', re.DOTALL),
+        'cron_delete': re.compile(r':::cron_delete:*\s*(.+?):::'),
+        'search': re.compile(r':::search:*\s*(.+?):::', re.DOTALL),
+        'foto': re.compile(r':::foto:*\s*(.+?):::', re.IGNORECASE),
+        'luz': re.compile(r':::luz:*\s+(\S+)\s+(\S+)(?:\s+(\S+))?:::'),
     }
     
     def __init__(self, output_callback: Callable[[str, str], None]):
@@ -87,6 +87,10 @@ class TUICommandProcessor:
             follow_up = ""
             async for chunk in client.stream_chat(model, chat_history):
                 follow_up += chunk
+            
+            # Strip thinking tags
+            follow_up = re.sub(r'<think>.*?</think>', '', follow_up, flags=re.DOTALL)
+            follow_up = re.sub(r'<think>.*', '', follow_up, flags=re.DOTALL)
             
             # Process any commands in follow-up
             await self._process_cron_commands(follow_up)

@@ -8,7 +8,7 @@ from src.jobs.base import BackgroundJob
 from src.client import OllamaClient
 from utils.email_utils import fetch_emails_last_24h, format_emails_for_llm, is_gmail_configured
 from utils.config_loader import get_config
-from utils.telegram_utils import format_bot_response, split_message, telegramify_content, send_telegramify_results
+from utils.telegram_utils import format_bot_response, split_message, telegramify_content, send_telegramify_results, strip_think_tags
 import re
 
 logger = logging.getLogger(__name__)
@@ -180,8 +180,10 @@ class EmailDigestJob(BackgroundJob):
         async for chunk in client.stream_chat(model, messages):
             summary += chunk
         
+        # Strip thinking tags
+        summary = strip_think_tags(summary)
+        
         # Convert to Telegram format and apply bot formatting
-        # summary = self._convert_to_telegram_markdown(summary) # Legacy
         summary = format_bot_response(summary)
         
         # Format the response

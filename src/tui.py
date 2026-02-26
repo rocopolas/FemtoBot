@@ -22,6 +22,7 @@ from src.tui_utils.history_manager import TUIHistoryManager
 from src.tui_handlers.command_processor import TUICommandProcessor
 from src.tui_handlers.slash_commands import TUISlashCommands
 from utils.config_loader import get_config
+from utils.telegram_utils import strip_think_tags
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -283,19 +284,22 @@ class FemtoBotApp(App):
         widget.timestamp = datetime.now().strftime("%H:%M")
         await widget.update(full_response)
         
+        # Strip think tags before command processing
+        clean_response = strip_think_tags(full_response)
+        
         # Process commands in response
         cleaned_response = await self.command_processor.process_response(
-            full_response, history
+            clean_response, history
         )
         
         # If response was modified (e.g., search), update display
-        if cleaned_response != full_response:
+        if cleaned_response != clean_response:
             await widget.update(cleaned_response)
         
-        # Add to history
+        # Add to history (without think tags)
         await self.chat_manager.append_message(
             self.chat_id,
-            {"role": "assistant", "content": full_response}
+            {"role": "assistant", "content": clean_response}
         )
         
         # Save history

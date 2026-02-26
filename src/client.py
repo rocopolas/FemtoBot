@@ -7,6 +7,7 @@ Supports two backends:
 import httpx
 import json
 import logging
+import re
 from typing import AsyncGenerator, Dict, List, Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -299,6 +300,10 @@ class OllamaClient:
             if response.status_code == 200:
                 data = response.json()
                 description = data.get("message", {}).get("content", "[No description]")
+                # Strip thinking tags
+                description = re.sub(r'<think>.*?</think>', '', description, flags=re.DOTALL)
+                description = re.sub(r'<think>.*', '', description, flags=re.DOTALL)
+                description = description.strip()
                 logger.debug(f"Image described successfully with model {model}")
                 return description
             else:
@@ -350,6 +355,10 @@ class OllamaClient:
                 choices = data.get("choices", [])
                 if choices:
                     content = choices[0].get("message", {}).get("content", "[No description]")
+                    # Strip thinking tags
+                    content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
+                    content = re.sub(r'<think>.*', '', content, flags=re.DOTALL)
+                    content = content.strip()
                     logger.debug(f"Image described via LM Studio with model {model}")
                     return content
                 return "[No description]"

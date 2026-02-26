@@ -14,6 +14,13 @@ _COMMAND_RE = re.compile(r':::\w+(?::)?\s*.*?:::', re.DOTALL)
 _TG_MAX_LEN = 4000
 
 
+def strip_think_tags(text: str) -> str:
+    """Remove all <think>...</think> blocks (closed and unclosed) from text."""
+    text = _THINK_CLOSED_RE.sub('', text)
+    text = _THINK_OPEN_RE.sub('', text)
+    return text
+
+
 def _clean_preview(text: str) -> str:
     """Strip command tokens for live preview (thinking tags are shown)."""
     text = _COMMAND_RE.sub('', text)
