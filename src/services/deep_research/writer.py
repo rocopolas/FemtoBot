@@ -1,4 +1,5 @@
 """Writer module: Synthesizes research into final report."""
+import re
 import logging
 from datetime import datetime
 from typing import List
@@ -6,6 +7,9 @@ from typing import List
 from src.services.deep_research.models import Chunk, ResearchContext
 
 logger = logging.getLogger(__name__)
+
+_THINK_CLOSED = re.compile(r'<think>.*?</think>', re.DOTALL)
+_THINK_OPEN = re.compile(r'<think>.*', re.DOTALL)
 
 
 class Writer:
@@ -43,6 +47,10 @@ class Writer:
             
             async for chunk in self.client.stream_chat(model, messages):
                 report += chunk
+            
+            # Strip thinking tags from report
+            report = _THINK_CLOSED.sub('', report)
+            report = _THINK_OPEN.sub('', report)
             
             # Add citations section at the end
             citations_section = self._generate_citations_section(chunks_with_citations)

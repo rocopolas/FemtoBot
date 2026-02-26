@@ -216,6 +216,10 @@ If uncertain, respond with "English".
             async for chunk in self.client.stream_chat(self.model, messages):
                 language += chunk
             
+            # Strip thinking tags
+            language = re.sub(r'<think>.*?</think>', '', language, flags=re.DOTALL)
+            language = re.sub(r'<think>.*', '', language, flags=re.DOTALL)
+            
             return language.strip()
         except Exception as e:
             logger.error(f"Error detecting language: {e}")

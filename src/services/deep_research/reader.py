@@ -2,6 +2,7 @@
 import asyncio
 import json
 import logging
+import re
 from datetime import datetime
 from typing import List, Optional
 
@@ -207,6 +208,10 @@ Guidelines:
         
         async for chunk in self.client.stream_chat(model, messages):
             full_response += chunk
+        
+        # Strip thinking tags
+        full_response = re.sub(r'<think>.*?</think>', '', full_response, flags=re.DOTALL)
+        full_response = re.sub(r'<think>.*', '', full_response, flags=re.DOTALL)
         
         return full_response.strip()
     

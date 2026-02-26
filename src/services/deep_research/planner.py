@@ -1,6 +1,7 @@
 """Planner module: Decomposes user questions into sub-tasks."""
 import json
 import logging
+import re
 from typing import List, Dict, Any
 import uuid
 
@@ -94,6 +95,10 @@ Guidelines:
         
         async for chunk in self.client.stream_chat(model, messages):
             full_response += chunk
+        
+        # Strip thinking tags
+        full_response = re.sub(r'<think>.*?</think>', '', full_response, flags=re.DOTALL)
+        full_response = re.sub(r'<think>.*', '', full_response, flags=re.DOTALL)
         
         return full_response.strip()
     
