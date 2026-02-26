@@ -13,7 +13,7 @@ from telegram.ext import (
     ApplicationBuilder, ContextTypes,
     CommandHandler, MessageHandler, filters
 )
-from telegram.error import BadRequest, Conflict
+from telegram.error import BadRequest, Conflict, NetworkError, TimedOut
 
 # Add parent directory to path
 _ABS_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -293,6 +293,11 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     error = context.error
     if isinstance(error, Conflict):
         logger.warning("Conflict detected - another bot instance is running. Retrying...")
+        return
+        
+    if isinstance(error, (NetworkError, TimedOut)):
+        # These are common transient errors during polling, don't spam the logs with tracebacks
+        logger.warning(f"Network polling error (can be safely ignored): {error}")
         return
     
     logger.error(f"Unhandled exception: {error}", exc_info=error)
