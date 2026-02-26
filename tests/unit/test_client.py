@@ -9,11 +9,16 @@ from src.client import OllamaClient
 class TestOllamaClient:
     """Test suite for Ollama client."""
     
+    @pytest.fixture(autouse=True)
+    def reset_shared_client(self):
+        """Reset shared client before and after each test."""
+        OllamaClient._shared_client = None
+        yield
+        OllamaClient._shared_client = None
+    
     @pytest.fixture
     def client(self):
         """Create test client."""
-        # Reset shared client to ensure mocks work
-        OllamaClient._shared_client = None
         return OllamaClient(base_url="http://localhost:11434")
     
     @pytest.mark.asyncio
@@ -42,9 +47,9 @@ class TestOllamaClient:
         stream_context.__aenter__ = AsyncMock(return_value=mock_response)
         stream_context.__aexit__ = AsyncMock(return_value=None)
         
-        with patch("httpx.AsyncClient") as mock_client_cls:
-            # Configure the client instance directly
+        with patch("src.client.httpx.AsyncClient") as mock_client_cls:
             mock_instance = mock_client_cls.return_value
+            mock_instance.is_closed = False
             mock_instance.stream = MagicMock(return_value=stream_context)
             
             chunks = []
@@ -56,9 +61,9 @@ class TestOllamaClient:
     @pytest.mark.asyncio
     async def test_stream_chat_connection_error(self, client):
         """Test handling of connection error."""
-        with patch("httpx.AsyncClient") as mock_client_cls:
+        with patch("src.client.httpx.AsyncClient") as mock_client_cls:
             mock_instance = mock_client_cls.return_value
-            # Configure stream to raise exception
+            mock_instance.is_closed = False
             mock_instance.stream = MagicMock(side_effect=Exception("Connection refused"))
             
             chunks = []
@@ -74,9 +79,9 @@ class TestOllamaClient:
         mock_response.status_code = 200
         mock_response.json.return_value = {"message": {"content": "A cat"}}
         
-        with patch("httpx.AsyncClient") as mock_client_cls:
+        with patch("src.client.httpx.AsyncClient") as mock_client_cls:
             mock_instance = mock_client_cls.return_value
-            # Configure post as an async method
+            mock_instance.is_closed = False
             mock_instance.post = AsyncMock(return_value=mock_response)
             
             result = await client.describe_image("vision-model", "base64data", "Describe this")
@@ -85,9 +90,9 @@ class TestOllamaClient:
     @pytest.mark.asyncio
     async def test_unload_model(self, client):
         """Test model unloading."""
-        with patch("httpx.AsyncClient") as mock_client_cls:
+        with patch("src.client.httpx.AsyncClient") as mock_client_cls:
             mock_instance = mock_client_cls.return_value
-            # Configure post as an async method
+            mock_instance.is_closed = False
             mock_instance.post = AsyncMock(return_value=MagicMock())
             
             result = await client.unload_model("test-model")

@@ -242,6 +242,21 @@ else
     exit 1
 fi
 
+# Crawl4AI: Install headless Chromium browser for web scraping
+echo -e "${CYAN}   Setting up Crawl4AI (web scraper)...${NC}"
+echo -e "${YELLOW}   Installing Playwright Chromium headless browser...${NC}"
+playwright install chromium 2>/dev/null || python -m playwright install chromium 2>/dev/null
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}   ✓ Chromium headless browser installed${NC}"
+else
+    echo -e "${YELLOW}   ⚠ Could not install Chromium automatically.${NC}"
+    echo -e "${YELLOW}   Run manually: playwright install chromium${NC}"
+fi
+
+# Initialize Crawl4AI database
+crawl4ai-setup --no-browser 2>/dev/null || echo -e "${YELLOW}   crawl4ai-setup skipped (will auto-init on first use)${NC}"
+echo -e "${GREEN}   ✓ Crawl4AI configured${NC}"
+
 # 4. Configuration Setup
 echo -e "\n${CYAN}[4/6] Setting up configuration...${NC}"
 

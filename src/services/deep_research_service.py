@@ -55,6 +55,23 @@ class DeepResearchService:
         """
         logger.info(f"Starting Deep Research V2 for chat {chat_id}: {topic[:50]}...")
         
+        # Setup per-session debug log file
+        debug_log_path = os.path.join(DATA_DIR, f"deep_research_debug_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+        os.makedirs(DATA_DIR, exist_ok=True)
+        file_handler = logging.FileHandler(debug_log_path, encoding="utf-8")
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        
+        # Add handler to the deep_research parent logger so all submodules log to it
+        dr_logger = logging.getLogger("src.services.deep_research")
+        dr_logger.addHandler(file_handler)
+        dr_logger.setLevel(logging.DEBUG)
+        # Also capture this service's logs
+        logger.addHandler(file_handler)
+        
+        logger.info(f"=== Deep Research Debug Log: {topic} ===")
+        logger.info(f"Debug log file: {debug_log_path}")
+        
         try:
             # Detect language
             language = await self._detect_language(topic)
@@ -101,6 +118,11 @@ class DeepResearchService:
             if status_callback:
                 await status_callback(f"❌ Error during research: {str(e)}")
             raise
+        finally:
+            # Clean up debug file handler
+            file_handler.close()
+            dr_logger.removeHandler(file_handler)
+            logger.removeHandler(file_handler)
     
     def _create_odt_report(self, title: str, markdown_content: str) -> str:
         """
@@ -210,6 +232,8 @@ Text: "{text}"
 
 Respond ONLY with the language name in English (e.g., "English", "Spanish", "French").
 If uncertain, respond with "English".
+
+/no_think
 """
             messages = [{"role": "user", "content": prompt}]
             language = ""

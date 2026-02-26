@@ -106,17 +106,13 @@ class DeepResearchOrchestrator:
             
             batch = pending_tasks[:batch_size]
             
-            await self._notify(f"🚀 Processing batch of {len(batch)} tasks concurrently...")
+            await self._notify(f"🚀 Processing {len(batch)} tasks...")
             
-            # Create coroutines for the batch
-            coroutines = []
+            # Process tasks sequentially — local models can only handle
+            # one LLM request at a time
             for task in batch:
                 context.iteration_count += 1
-                coroutines.append(self._process_task(task, context, context.iteration_count))
-            
-            # Execute batch
-            import asyncio
-            await asyncio.gather(*coroutines)
+                await self._process_task(task, context, context.iteration_count)
             
             # Notify iteration progress
             await self._notify(f"📊 Progress: {context.iteration_count}/{self.max_iterations} iterations completed")

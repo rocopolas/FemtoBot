@@ -1683,6 +1683,35 @@ def doctor():
         click.secho("  ✗ ChromaDB not installed", fg=RED)
         issues += 1
 
+    # 9. Crawl4AI + Playwright
+    try:
+        import crawl4ai
+        click.secho(f"  ✓ Crawl4AI {crawl4ai.__version__}", fg=GREEN)
+    except (ImportError, AttributeError):
+        try:
+            import crawl4ai
+            click.secho("  ✓ Crawl4AI installed", fg=GREEN)
+        except ImportError:
+            click.secho("  ✗ Crawl4AI not installed (pip install crawl4ai)", fg=RED)
+            issues += 1
+
+    # Check Playwright Chromium browser
+    try:
+        result = subprocess.run(
+            ["playwright", "install", "--dry-run", "chromium"],
+            capture_output=True, text=True, timeout=5
+        )
+        # Fallback: just check if the binary exists
+        import glob
+        chromium_paths = glob.glob(os.path.expanduser("~/.cache/ms-playwright/chromium*/chrome-linux*/chrome"))
+        if chromium_paths:
+            click.secho("  ✓ Playwright Chromium browser installed", fg=GREEN)
+        else:
+            click.secho("  ✗ Playwright Chromium not found (run: playwright install chromium)", fg=YELLOW)
+            issues += 1
+    except Exception:
+        click.secho("  ⚠ Could not verify Playwright browser", fg=YELLOW)
+
     # Summary
     click.echo()
     if issues == 0:

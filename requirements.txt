@@ -11,7 +11,7 @@ pymupdf
 python-docx
 markdown
 psutil>=5.9.0
-trafilatura
+crawl4ai
 
 # Optional: WIZ smart lights
 pywizlight

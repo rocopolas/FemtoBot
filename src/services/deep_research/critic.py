@@ -309,10 +309,22 @@ Guidelines:
             full_response += chunk
         
         # Strip thinking tags
-        full_response = re.sub(r'<think>.*?</think>', '', full_response, flags=re.DOTALL)
-        full_response = re.sub(r'<think>.*', '', full_response, flags=re.DOTALL)
+        cleaned = re.sub(r'<think>.*?</think>', '', full_response, flags=re.DOTALL)
+        cleaned = re.sub(r'<think>.*', '', cleaned, flags=re.DOTALL)
+        cleaned = cleaned.strip()
         
-        return full_response.strip()
+        # If stripping think tags left nothing, try to extract JSON from within them
+        if not cleaned:
+            for pattern in [r'<think>(.*?)</think>', r'<think>(.*)']:
+                think_match = re.search(pattern, full_response, flags=re.DOTALL)
+                if think_match:
+                    # Try JSON object or array
+                    json_match = re.search(r'(\{[\s\S]*\}|\[[\s\S]*\])', think_match.group(1))
+                    if json_match:
+                        cleaned = json_match.group(1).strip()
+                        break
+        
+        return cleaned
     
     def _parse_evaluation_response(self, response: str) -> dict:
         """Parse evaluation JSON response."""

@@ -36,68 +36,56 @@ class Reader:
     ) -> List[Chunk]:
         """
         Extract relevant content chunks from sources.
-        Uses rate-limited concurrent fetching with delay between requests.
-        
-        Args:
-            sources: List of sources to read
-            task_query: The original task query for relevance checking
-            model: LLM model to use
-            
-        Returns:
-            List of Chunk objects with relevant content
+        Fetches pages concurrently, then runs LLM extraction sequentially
+        (local models can only handle one request at a time).
         """
         chunks = []
-        semaphore = asyncio.Semaphore(self.max_concurrent)
         
-        async def process_source(source: Source) -> List[Chunk]:
-            """Process a single source with rate limiting."""
-            async with semaphore:
-                try:
-                    # Fetch full content using WebFetcher (trafilatura)
-                    content = await self._fetch_content(source.url)
-                    
-                    if not content or len(content.strip()) < 50:
-                        # Use description as fallback
-                        logger.warning(f"Using description fallback for {source.url}")
-                        content = source.description
-                    
-                    source.fetched_content = content
-                    source.fetched_at = datetime.now()
-                    
-                    # Extract relevant chunks using LLM
-                    extracted_chunks = await self._extract_relevant_chunks(
-                        content=content,
-                        source=source,
-                        task_query=task_query,
-                        model=model
-                    )
-                    
-                    # Add delay between requests to be polite
-                    await asyncio.sleep(self.fetch_delay)
-                    
-                    return extracted_chunks
-                    
-                except Exception as e:
-                    logger.error(f"Error reading source {source.url}: {e}")
-                    # Create chunk from description as fallback
-                    return [Chunk(
-                        content=source.description,
-                        source=source,
-                        relevance_score=0.5,
-                        extracted_at=datetime.now(),
-                        task_id=source.task_id
-                    )]
+        # PHASE 1: Fetch all pages concurrently (fast IO)
+        async def fetch_one(source: Source) -> tuple:
+            """Fetch a single source's content."""
+            try:
+                content = await self._fetch_content(source.url)
+                if not content or len(content.strip()) < 50:
+                    logger.warning(f"Using description fallback for {source.url}")
+                    content = source.description
+                source.fetched_content = content
+                source.fetched_at = datetime.now()
+                return (source, content)
+            except Exception as e:
+                logger.error(f"Error fetching {source.url}: {e}")
+                return (source, source.description)
         
-        # Process all sources concurrently with rate limiting
-        tasks = [process_source(source) for source in sources]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        logger.info(f"Fetching {len(sources)} pages concurrently...")
+        fetch_tasks = [fetch_one(s) for s in sources]
+        fetched = await asyncio.gather(*fetch_tasks, return_exceptions=True)
         
-        # Collect all chunks
-        for result in results:
-            if isinstance(result, list):
-                chunks.extend(result)
-            elif isinstance(result, Exception):
-                logger.error(f"Source processing failed: {result}")
+        # PHASE 2: LLM extraction — ONE AT A TIME (local model limitation)
+        for result in fetched:
+            if isinstance(result, Exception):
+                logger.error(f"Fetch failed: {result}")
+                continue
+            
+            source, content = result
+            try:
+                extracted = await self._extract_relevant_chunks(
+                    content=content,
+                    source=source,
+                    task_query=task_query,
+                    model=model
+                )
+                chunks.extend(extracted)
+                logger.info(f"Extracted {len(extracted)} chunks from {source.url}")
+            except Exception as e:
+                logger.error(f"Extraction error for {source.url}: {e}")
+                # Fallback: use raw content as a chunk
+                chunks.append(Chunk(
+                    content=content[:2000] if content else source.description,
+                    source=source,
+                    relevance_score=0.5,
+                    extracted_at=datetime.now(),
+                    task_id=source.task_id
+                ))
         
         logger.info(f"Reader extracted {len(chunks)} chunks from {len(sources)} sources")
         return chunks
@@ -131,6 +119,7 @@ class Reader:
         
         try:
             response = await self._get_llm_response(prompt, model)
+            logger.debug(f"Extraction response for {source.url}: {response[:500]}")
             chunks_data = self._parse_extraction_response(response)
             
             chunks = []
@@ -202,18 +191,45 @@ Guidelines:
 """
     
     async def _get_llm_response(self, prompt: str, model: str) -> str:
-        """Get response from LLM."""
-        messages = [{"role": "user", "content": prompt}]
+        """Get response from LLM (thinking disabled for extraction speed)."""
+        messages = [
+            {"role": "system", "content": "You are a precise data extraction assistant. Respond ONLY with valid JSON. Do not think out loud or explain."},
+            {"role": "user", "content": prompt}
+        ]
         full_response = ""
         
         async for chunk in self.client.stream_chat(model, messages):
             full_response += chunk
         
-        # Strip thinking tags
-        full_response = re.sub(r'<think>.*?</think>', '', full_response, flags=re.DOTALL)
-        full_response = re.sub(r'<think>.*', '', full_response, flags=re.DOTALL)
+        logger.debug(f"RAW LLM response ({len(full_response)} chars): {full_response[:1000]}")
         
-        return full_response.strip()
+        # Strip thinking tags
+        cleaned = re.sub(r'<think>.*?</think>', '', full_response, flags=re.DOTALL)
+        cleaned = re.sub(r'<think>.*', '', cleaned, flags=re.DOTALL)
+        cleaned = cleaned.strip()
+        
+        # If stripping think tags left nothing, try to extract JSON from within them
+        if not cleaned:
+            # Look for JSON array inside think blocks
+            think_match = re.search(r'<think>(.*?)</think>', full_response, flags=re.DOTALL)
+            if think_match:
+                think_content = think_match.group(1)
+                # Try to find a JSON array in the think content
+                json_match = re.search(r'(\[[\s\S]*\])', think_content)
+                if json_match:
+                    cleaned = json_match.group(1).strip()
+                    logger.debug("Salvaged JSON from inside <think> block")
+            # Also check unclosed think
+            if not cleaned:
+                think_match = re.search(r'<think>(.*)', full_response, flags=re.DOTALL)
+                if think_match:
+                    think_content = think_match.group(1)
+                    json_match = re.search(r'(\[[\s\S]*\])', think_content)
+                    if json_match:
+                        cleaned = json_match.group(1).strip()
+                        logger.debug("Salvaged JSON from unclosed <think> block")
+        
+        return cleaned
     
     def _parse_extraction_response(self, response: str) -> List[dict]:
         """Parse JSON response from LLM."""
