@@ -22,10 +22,9 @@ def _get_searxng_url() -> str:
 SEARXNG_URL = _get_searxng_url()
 
 
-class BraveSearch:
+class WebSearch:
     """
     Web search via SearXNG (self-hosted).
-    Class name kept as BraveSearch for backward compatibility.
     """
     
     @staticmethod
@@ -129,16 +128,16 @@ class BraveSearch:
         Search the web and scrape the top results for full content.
         Returns formatted results with full page text for richer LLM context.
         """
-        raw_results = await BraveSearch._raw_search(query, count)
+        raw_results = await WebSearch._raw_search(query, count)
         if not raw_results:
-            return await BraveSearch.search(query, count)
+            return await WebSearch.search(query, count)
         
         try:
             from utils.web_fetcher import WebFetcher
             fetcher = WebFetcher(max_content_length=4000)
         except ImportError:
             logger.warning("WebFetcher not available, falling back to basic search")
-            return await BraveSearch.search(query, count)
+            return await WebSearch.search(query, count)
         
         import asyncio
         

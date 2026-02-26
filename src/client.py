@@ -102,11 +102,17 @@ class OllamaClient:
         self, model: str, messages: Messages
     ) -> AsyncGenerator[str, None]:
         """Stream chat via Ollama native API."""
+        from utils.config_loader import get_config
+        context_limit = get_config("CONTEXT_LIMIT", 8192)
+        
         url = f"{self.base_url}/api/chat"
         payload = {
             "model": model,
             "messages": messages,
-            "stream": True 
+            "stream": True,
+            "options": {
+                "num_ctx": context_limit
+            }
         }
         
         client = self._get_client()
@@ -169,11 +175,15 @@ class OllamaClient:
         self, model: str, messages: Messages
     ) -> AsyncGenerator[str, None]:
         """Stream chat via OpenAI-compatible API (LM Studio)."""
+        from utils.config_loader import get_config
+        context_limit = get_config("CONTEXT_LIMIT", 8192)
+        
         url = f"{self.base_url}/v1/chat/completions"
         payload = {
             "model": model,
             "messages": messages,
-            "stream": True
+            "stream": True,
+            "max_tokens": context_limit
         }
         
         client = self._get_client()
@@ -238,6 +248,64 @@ class OllamaClient:
             yield error_msg
 
     # ── Model Management ────────────────────────────────────────────
+
+    async def load_model(self, model: str) -> bool:
+        """
+        Explicitly load a model with specific parameters from config.
+        Particularly useful for LM Studio to set context length and flash attention.
+        """
+        from utils.config_loader import get_config
+        context_limit = get_config("CONTEXT_LIMIT", 8192)
+        
+        if self.provider == "lmstudio":
+            # For LM Studio: use the specific load endpoint
+            # Note: This often requires the base URL to be adjusted if it points to /v1
+            # Usually LM Studio API is on port 1234
+            base = self.base_url.replace("/v1", "") if self.base_url.endswith("/v1") else self.base_url
+            url = f"{base}/api/v1/models/load"
+            
+            payload = {
+                "model": model,
+                "context_length": context_limit,
+                "flash_attention": True
+            }
+            try:
+                client = self._get_client()
+                response = await client.post(url, json=payload, timeout=60.0)
+                if response.status_code == 200:
+                    logger.info(f"Successfully loaded model in LM Studio: {model} with ctx {context_limit}")
+                    return True
+                else:
+                    logger.warning(f"Failed to load model {model} in LM Studio: {response.status_code} - {response.text}")
+                    return False
+            except Exception as e:
+                logger.error(f"Error loading model {model} in LM Studio: {e}")
+                return False
+                
+        else:
+            # For Ollama: We can just use the /api/generate endpoint with a tiny prompt and keep_alive
+            # to pre-load the model into memory.
+            url = f"{self.base_url}/api/generate"
+            payload = {
+                "model": model,
+                "prompt": "",
+                "keep_alive": "5m",
+                "options": {
+                    "num_ctx": context_limit
+                }
+            }
+            try:
+                client = self._get_client()
+                response = await client.post(url, json=payload, timeout=60.0)
+                if response.status_code == 200:
+                    logger.info(f"Successfully pre-loaded model in Ollama: {model}")
+                    return True
+                else:
+                    logger.warning(f"Failed to pre-load model {model} in Ollama: {response.text}")
+                    return False
+            except Exception as e:
+                logger.error(f"Error pre-loading model {model} in Ollama: {e}")
+                return False
 
     async def unload_model(self, model: str) -> bool:
         """

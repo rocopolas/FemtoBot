@@ -3,7 +3,7 @@ import logging
 from typing import List
 
 from src.services.deep_research.models import ResearchTask, Source
-from utils.search_utils import BraveSearch
+from utils.search_utils import WebSearch
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +27,8 @@ class Hunter:
         logger.info(f"Hunter searching for task: {task.query}")
         
         try:
-            # Use Brave Search API
-            search_results = await BraveSearch.search(
+            # Use Web Search API
+            search_results = await WebSearch.search(
                 query=task.query,
                 count=self.search_count
             )
@@ -44,13 +44,13 @@ class Hunter:
             return []
     
     def _parse_search_results(self, results: str, task_id: str) -> List[Source]:
-        """Parse Brave Search results into Source objects."""
+        """Parse SearXNG Search results into Source objects."""
         sources = []
         
         if not results or results.startswith("[") or results.startswith("No results"):
             return sources
         
-        # Parse the formatted results from BraveSearch
+        # Parse the formatted results from WebSearch
         # Format: "1. **Title**\n   Description\n   URL"
         entries = results.split("\n\n")
         

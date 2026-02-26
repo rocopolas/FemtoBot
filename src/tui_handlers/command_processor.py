@@ -65,13 +65,13 @@ class TUICommandProcessor:
     
     async def _handle_search(self, match, response: str, chat_history: List[Dict]) -> str:
         """Handle search command."""
-        from utils.search_utils import BraveSearch
+        from utils.search_utils import WebSearch
         
         query = match.group(1).strip()
         self.output(f"🔍 Searching: {query}", "info")
         
         try:
-            results = await BraveSearch.search(query)
+            results = await WebSearch.search(query)
             
             # Add to history
             chat_history.append({"role": "assistant", "content": response})

@@ -28,7 +28,7 @@ from src.services.upload_service import UploadService
 from utils.cron_utils import CronUtils
 from utils.config_loader import get_config, is_feature_enabled
 from utils.telegram_utils import split_message, format_bot_response, prune_history, telegramify_content, send_telegramify_results, stream_to_telegram
-from utils.search_utils import BraveSearch
+from utils.search_utils import WebSearch
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +138,9 @@ class MessageProcessor:
             history = await self.chat_manager.get_history(chat_id)
             model = get_config("MODEL")
             context_limit = get_config("CONTEXT_LIMIT", 30000)
+            
+            # Ensure model is strictly loaded with our parameters
+            await self.ollama_client.load_model(model)
             
             pruned_history = prune_history(history, context_limit)
             
@@ -341,6 +344,8 @@ class MessageProcessor:
             else:
                  math_messages.append({"role": "user", "content": original_user_text})
             
+            await self.ollama_client.load_model(math_model)
+            
             math_response = await stream_to_telegram(
                 self.ollama_client.stream_chat(math_model, math_messages),
                 placeholder_msg
@@ -355,7 +360,7 @@ class MessageProcessor:
             search_query = search_match.group(1).strip()
             await placeholder_msg.edit_text(f"🔍 Searching & scraping: {search_query}...")
             
-            search_results = await BraveSearch.search_with_scrape(search_query)
+            search_results = await WebSearch.search_with_scrape(search_query)
             
             # Add intermediate exchange to history
             await self.chat_manager.append_message(chat_id, {"role": "assistant", "content": full_response})
@@ -368,6 +373,9 @@ class MessageProcessor:
             history = await self.chat_manager.get_history(chat_id)
             model = get_config("MODEL")
             context_limit = get_config("CONTEXT_LIMIT", 30000)
+            
+            await self.ollama_client.load_model(model)
+            
             final_response = await stream_to_telegram(
                 self.ollama_client.stream_chat(model, prune_history(history, context_limit)),
                 placeholder_msg

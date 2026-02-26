@@ -12,7 +12,7 @@ A smart personal assistant designed for small local models, recommended for GPUs
 - 🎙️ **Audio transcription** - Convert voice messages to text with Whisper
 - 🎥 **YouTube summaries** - Send a link and get a summary
 - 🐦 **Twitter/X downloader** - Download videos/images directly
-- 🔍 **Web search** - Brave Search integration
+- 🔍 **Web search** - SearXNG Search integration
 - 🖼️ **Image search** - Search for images on the web
 - 📄 **Document reading** - Analyze and chat with PDF or text files
 - 📧 **Email digest** - Read and summarize emails from Gmail
@@ -140,7 +140,6 @@ femtobot update     # Pull setup updates
 TELEGRAM_TOKEN=your_botfather_token
 AUTHORIZED_USERS=123456789  # Your Telegram ID
 NOTIFICATION_CHAT_ID=123456789
-BRAVE_API_KEY=your_api_key  # Optional, for searches
 GMAIL_USER=your_email@gmail.com  # Optional, for email digest
 GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
 ```
@@ -262,7 +261,7 @@ FemtoBot/
 │   ├── audio_utils.py       # Whisper transcription
 │   ├── youtube_utils.py     # YouTube audio download
 │   ├── twitter_utils.py     # Twitter/X downloads
-│   ├── search_utils.py      # Brave search
+│   ├── search_utils.py      # SearXNG search
 │   ├── cron_utils.py        # Crontab management
 │   ├── document_utils.py    # PDF/DOCX extraction
 │   ├── email_utils.py       # Gmail integration
@@ -316,7 +315,7 @@ FemtoBot/
 ┌────────────────────┴────────────────────────┐
 │           Utility Services                  │
 │  ┌─────────┐ ┌─────────┐ ┌─────────────┐    │
-│  │ Whisper │ │  Brave  │ │  YouTube    │    │
+│  │ Whisper │ │ SearXNG │ │  YouTube    │    │
 │  │(Speech) │ │ Search  │ │  Download   │    │
 │  └─────────┘ └─────────┘ └─────────────┘    │
 │  ┌─────────┐ ┌─────────┐ ┌─────────────┐    │

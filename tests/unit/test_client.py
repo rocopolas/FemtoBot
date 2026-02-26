@@ -22,7 +22,8 @@ class TestOllamaClient:
         return OllamaClient(base_url="http://localhost:11434")
     
     @pytest.mark.asyncio
-    async def test_stream_chat_success(self, client):
+    @patch('src.client.get_config', return_value=8192)
+    async def test_stream_chat_success(self, mock_get_config, client):
         """Test successful streaming chat."""
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -59,7 +60,8 @@ class TestOllamaClient:
             assert "Hello" in "".join(chunks)
     
     @pytest.mark.asyncio
-    async def test_stream_chat_connection_error(self, client):
+    @patch('src.client.get_config', return_value=8192)
+    async def test_stream_chat_connection_error(self, mock_get_config, client):
         """Test handling of connection error."""
         with patch("src.client.httpx.AsyncClient") as mock_client_cls:
             mock_instance = mock_client_cls.return_value
@@ -77,7 +79,8 @@ class TestOllamaClient:
         """Test image description."""
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"message": {"content": "A cat"}}
+        # The Ollama API returns response in {"response": "..."} format for generate endpoint
+        mock_response.json.return_value = {"response": "A cat"}
         
         with patch("src.client.httpx.AsyncClient") as mock_client_cls:
             mock_instance = mock_client_cls.return_value

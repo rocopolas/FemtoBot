@@ -544,7 +544,6 @@ def setup():
         notif_chat = click.prompt("📢 Notification Chat ID", default=auth_users.split(',')[0].strip(), show_default=True)
         
         click.echo("\n--- Optional Integrations (press Enter to skip) ---")
-        brave_key = click.prompt("🔍 Brave Search API Key", default="", show_default=False)
         gmail_user = click.prompt("📧 Gmail User", default="", show_default=False)
         gmail_pass = ""
         if gmail_user:
@@ -553,8 +552,6 @@ def setup():
         try:
             with open(env_path, "w") as f:
                 f.write(f"# Telegram\nTELEGRAM_TOKEN={telegram_token}\nAUTHORIZED_USERS={auth_users}\nNOTIFICATION_CHAT_ID={notif_chat}\n\n")
-                if brave_key:
-                    f.write(f"# Search\nBRAVE_API_KEY={brave_key}\n\n")
                 if gmail_user:
                     f.write(f"# Email\nGMAIL_USER={gmail_user}\nGMAIL_APP_PASSWORD={gmail_pass}\n")
                     
@@ -899,7 +896,7 @@ def wizard():
         click.echo("  1. 🐰 Edit Models")
         click.echo("  2. ⚡ Toggle Features")
         click.echo("  3. 📱 Edit Telegram Settings")
-        click.echo("  4. 🔌 Edit Integrations (Brave, Gmail)")
+        click.echo("  4. 🔌 Edit Integrations (Gmail, etc)")
         click.echo("  5. 💡 Edit WIZ Lights")
         click.echo("  6. 🧪 Test Services")
         click.echo("  7. 💾 Save & Exit")
@@ -989,11 +986,6 @@ def wizard():
             # Edit Integrations
             click.secho("\n--- Integrations ---\n", fg=CYAN)
 
-            brave = click.prompt("  Brave Search API Key", default=env_vars.get("BRAVE_API_KEY", ""), show_default=False)
-            if brave:
-                env_vars["BRAVE_API_KEY"] = brave
-                modified = True
-
             gmail = click.prompt("  Gmail User", default=env_vars.get("GMAIL_USER", ""), show_default=False)
             if gmail:
                 env_vars["GMAIL_USER"] = gmail
@@ -1080,13 +1072,6 @@ def wizard():
                 click.secho(f"  ✓ Gmail: configured ({gmail_user})", fg=GREEN)
             else:
                 click.secho("  ⚠ Gmail: not configured (optional)", fg=YELLOW)
-
-            # Brave
-            brave_key = env_vars.get("BRAVE_API_KEY", "")
-            if brave_key:
-                click.secho("  ✓ Brave Search: configured", fg=GREEN)
-            else:
-                click.secho("  ⚠ Brave Search: not configured (optional)", fg=YELLOW)
 
             # FFmpeg
             try:
@@ -1585,7 +1570,6 @@ def doctor():
              issues += 1
              
         # Optional warnings
-        if config.get("BRAVE_API_KEY"): click.secho("  ✓ BRAVE_API_KEY set", fg=GREEN)
         if config.get("GMAIL_USER"): click.secho("  ✓ GMAIL_USER set", fg=GREEN)
         if config.get("NOTIFICATION_CHAT_ID"): click.secho("  ✓ NOTIFICATION_CHAT_ID set", fg=GREEN)
 

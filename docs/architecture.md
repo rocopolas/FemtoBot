@@ -36,7 +36,7 @@ FemtoBot is a privacy-focused AI assistant that runs locally using Ollama LLM. I
 ┌────────────────────┴────────────────────────┐
 │           Utility Services                  │
 │  ┌─────────┐ ┌─────────┐ ┌─────────────┐    │
-│  │ Whisper │ │  Brave  │ │  YouTube    │    │
+│  │ Whisper │ │ SearXNG │ │  YouTube    │    │
 │  │(Speech) │ │ Search  │ │  Download   │    │
 │  └─────────┘ └─────────┘ └─────────────┘    │
 │  ┌─────────┐ ┌─────────┐ ┌─────────────┐    │

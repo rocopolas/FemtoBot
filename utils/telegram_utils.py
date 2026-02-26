@@ -30,7 +30,7 @@ def _clean_preview(text: str) -> str:
 async def stream_to_telegram(
     stream: AsyncGenerator[str, None],
     message,
-    interval: float = 1.0,
+    interval: float = 5.0,
 ) -> str:
     """
     Consume an LLM streaming generator while updating a Telegram message
