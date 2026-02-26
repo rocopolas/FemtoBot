@@ -1249,6 +1249,162 @@ def memory_status():
         click.secho(f"  ✗ Error reading database: {e}", fg=RED)
 
 
+@memory.command("list")
+@click.option("-n", "--limit", default=20, help="Max entries to show")
+@click.option("-t", "--type", "collection_type", default="memory",
+              type=click.Choice(["memory", "documents"]),
+              help="Collection to list")
+def memory_list(limit, collection_type):
+    """List all stored memories with their IDs."""
+    sys.path.insert(0, PROJECT_ROOT)
+
+    click.secho(f"=== {collection_type.title()} Entries ===\n", fg=CYAN, bold=True)
+
+    try:
+        import chromadb
+        from src.constants import DATA_DIR
+
+        db_path = os.path.join(DATA_DIR, "chroma_db")
+        if not os.path.exists(db_path):
+            click.secho("  No vector database found.", fg=YELLOW)
+            return
+
+        client = chromadb.PersistentClient(path=db_path)
+
+        try:
+            collection = client.get_collection(collection_type)
+        except Exception:
+            click.secho(f"  Collection '{collection_type}' not found.", fg=YELLOW)
+            return
+
+        total = collection.count()
+        if total == 0:
+            click.secho("  No entries found.", fg=YELLOW)
+            return
+
+        results = collection.get(limit=limit, include=["documents", "metadatas"])
+
+        for i, (doc_id, doc) in enumerate(zip(results["ids"], results["documents"])):
+            preview = doc[:150].replace("\n", " ")
+            if len(doc) > 150:
+                preview += "..."
+            click.secho(f"  [{i+1}] ", fg=CYAN, nl=False)
+            click.secho(f"ID: {doc_id}", fg=YELLOW)
+            click.echo(f"      {preview}")
+            click.echo()
+
+        if total > limit:
+            click.secho(f"  ... showing {limit}/{total}. Use -n to show more.", fg=YELLOW)
+
+    except Exception as e:
+        click.secho(f"  ✗ Error: {e}", fg=RED)
+
+
+@memory.command("delete")
+@click.argument("target")
+@click.option("--by-id", is_flag=True, help="Delete by exact ID instead of search")
+@click.option("-t", "--type", "collection_type", default="memory",
+              type=click.Choice(["memory", "documents"]),
+              help="Collection to delete from")
+def memory_delete(target, by_id, collection_type):
+    """Delete a memory by ID or search term.
+
+    Examples:
+
+      femtobot memory delete --by-id "mem_abc123"
+
+      femtobot memory delete "rocopolas creador"
+    """
+    import asyncio
+    sys.path.insert(0, PROJECT_ROOT)
+
+    if by_id:
+        # Direct delete by ID
+        try:
+            import chromadb
+            from src.constants import DATA_DIR
+
+            db_path = os.path.join(DATA_DIR, "chroma_db")
+            client = chromadb.PersistentClient(path=db_path)
+            collection = client.get_collection(collection_type)
+
+            # Check it exists
+            existing = collection.get(ids=[target])
+            if not existing["ids"]:
+                click.secho(f"  ✗ ID '{target}' not found.", fg=RED)
+                return
+
+            preview = existing["documents"][0][:100].replace("\n", " ")
+            click.secho(f"  Deleting: {preview}...", fg=YELLOW)
+
+            if click.confirm("  Are you sure?"):
+                collection.delete(ids=[target])
+                click.secho("  ✓ Deleted.", fg=GREEN)
+            else:
+                click.secho("  Cancelled.", fg=YELLOW)
+
+        except Exception as e:
+            click.secho(f"  ✗ Error: {e}", fg=RED)
+    else:
+        # Search and delete
+        async def _search_delete():
+            from utils.config_loader import get_all_config
+            from src.client import OllamaClient
+            from src.memory.vector_store import VectorManager
+
+            vm = VectorManager(get_all_config(), OllamaClient())
+            query_embedding = await vm._get_embedding(target)
+            if not query_embedding:
+                click.secho("  ✗ Failed to generate embedding.", fg=RED)
+                return
+
+            collection = vm.memory_collection if collection_type == "memory" else vm.documents_collection
+            results = collection.query(
+                query_embeddings=[query_embedding],
+                n_results=5,
+            )
+
+            if not results["documents"] or not results["documents"][0]:
+                click.secho("  No matching entries found.", fg=YELLOW)
+                return
+
+            click.secho(f"\n  Found {len(results['documents'][0])} matches:\n", fg=CYAN)
+            for i, (doc_id, doc) in enumerate(zip(results["ids"][0], results["documents"][0])):
+                distance = results["distances"][0][i]
+                similarity = 1 - distance
+                preview = doc[:120].replace("\n", " ")
+                if len(doc) > 120:
+                    preview += "..."
+                color = GREEN if similarity >= 0.6 else YELLOW if similarity >= 0.4 else RED
+                click.secho(f"  [{i+1}] ", fg=CYAN, nl=False)
+                click.secho(f"({similarity:.1%}) ", fg=color, nl=False)
+                click.echo(preview)
+                click.secho(f"      ID: {doc_id}", fg=YELLOW)
+                click.echo()
+
+            choice = click.prompt(
+                "  Enter number to delete (or 'q' to cancel)",
+                default="q"
+            )
+
+            if choice.lower() == "q":
+                click.secho("  Cancelled.", fg=YELLOW)
+                return
+
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(results["ids"][0]):
+                    doc_id = results["ids"][0][idx]
+                    collection.delete(ids=[doc_id])
+                    click.secho(f"  ✓ Deleted entry {doc_id}", fg=GREEN)
+                else:
+                    click.secho("  ✗ Invalid number.", fg=RED)
+            except ValueError:
+                click.secho("  ✗ Invalid input.", fg=RED)
+
+        asyncio.run(_search_delete())
+
+
 # ─── BACKUP / RESTORE ────────────────────────────────────────────────
 
 @cli.command()

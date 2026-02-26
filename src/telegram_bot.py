@@ -79,14 +79,14 @@ email_digest_job = EmailDigestJob(notification_chat_id=NOTIFICATION_CHAT_ID) if 
 # Config values
 MODEL = get_config("MODEL")
 COMMAND_PATTERNS = {
-    'memory': re.compile(r':::memory(?!_delete)(?::)?\s*(.+?):::', re.DOTALL),
-    'memory_delete': re.compile(r':::memory_delete(?::)?\s*(.+?):::', re.DOTALL),
-    'cron': re.compile(r':::cron(?::)?\s*(.+?):::', re.DOTALL),
-    'cron_delete': re.compile(r':::cron_delete(?::)?\s*(.+?):::'),
-    'search': re.compile(r':::search(?::)?\s*(.+?):::', re.DOTALL),
-    'foto': re.compile(r':::foto(?::)?\s*(.+?):::', re.IGNORECASE),
-    'luz': re.compile(r':::luz(?::)?\s+(\S+)\s+(\S+)(?:\s+(\S+))?:::'),
-    'camara': re.compile(r':::camara(?::)?(?:\s+\S+)?:::'),
+    'memory': re.compile(r':::memory(?!_delete):*\s*(.+?):::', re.DOTALL),
+    'memory_delete': re.compile(r':::memory_delete:*\s*(.+?):::', re.DOTALL),
+    'cron': re.compile(r':::cron(?!_delete):*\s*(.+?):::', re.DOTALL),
+    'cron_delete': re.compile(r':::cron_delete:*\s*(.+?):::'),
+    'search': re.compile(r':::search:*\s*(.+?):::', re.DOTALL),
+    'foto': re.compile(r':::foto:*\s*(.+?):::', re.IGNORECASE),
+    'luz': re.compile(r':::luz:*\s+(\S+)\s+(\S+)(?:\s+(\S+))?:::'),
+    'camara': re.compile(r':::camara:*(?:\s+\S+)?:::'),
     'matematicas': re.compile(r':::matematicas:::'),
 }
 

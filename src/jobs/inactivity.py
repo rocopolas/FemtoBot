@@ -16,7 +16,7 @@ class InactivityJob(BackgroundJob):
     def __init__(self, get_last_activity_func, model: str = None):
         self.get_last_activity = get_last_activity_func
         self.model = model or get_config("MODEL")
-        self.inactivity_threshold_minutes = 30
+        self.inactivity_threshold_minutes = get_config("INACTIVITY_TIMEOUT_MINUTES", 30)
     
     @property
     def name(self) -> str:

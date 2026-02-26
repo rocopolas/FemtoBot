@@ -1,12 +1,11 @@
 BACKEND:
-  PROVIDER: lmstudio            # "ollama" or "lmstudio"
+  PROVIDER: lmstudio
   OLLAMA_URL: http://localhost:11434
   LMSTUDIO_URL: http://localhost:1234
-
 MODEL: qwen/qwen3.5-35b-a3b
-VISION_MODEL: 
+VISION_MODEL: null
 MATH_MODEL: lmstudio-community/Qwen2.5-Math-7B-Instruct-GGUF
-OCR_MODEL: 
+OCR_MODEL: null
 CONTEXT_LIMIT: 30000
 WHISPER_LANGUAGE: es
 WHISPER_MODEL_VOICE: turbo
@@ -18,14 +17,12 @@ EMAIL_DIGEST_TIME: 08:00
 EVENTS_CHECK_INTERVAL_SECONDS: 60
 EVENTS_FILE: data/events.txt
 INSTRUCTIONS_FILE: data/instructions.md
-
 RAG:
   EMBEDDING_MODEL: Qwen/Qwen3-Embedding-0.6B-GGUF
   CHUNK_SIZE: 1000
   CHUNK_OVERLAP: 200
   SIMILARITY_THRESHOLD: 0.4
   MAX_RESULTS: 3
-
 FEATURES:
   WIZ_LIGHTS: false
   EMAIL_DIGEST: false

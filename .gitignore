@@ -18,3 +18,4 @@ femtobot.pid
 *.pid
 .gemini/
 
+src/__pycache__/telegram_bot.cpython-312.pyc

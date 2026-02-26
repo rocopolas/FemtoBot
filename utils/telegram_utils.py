@@ -35,7 +35,8 @@ async def stream_to_telegram(
         interval: seconds between edits (default 1.0)
 
     Returns:
-        The complete raw response string (un-cleaned, for post-processing).
+        The response string with thinking tags stripped
+        (safe for command processing).
     """
     full_response = ""
     last_edit = 0.0
@@ -56,6 +57,11 @@ async def stream_to_telegram(
                     pass  # Rate limit, same content, or bot shutting down
                 last_preview = preview
                 last_edit = now
+
+    # Strip thinking tags before returning so commands inside
+    # <think> blocks are never processed
+    full_response = _THINK_CLOSED_RE.sub('', full_response)
+    full_response = _THINK_OPEN_RE.sub('', full_response)
 
     return full_response
 
