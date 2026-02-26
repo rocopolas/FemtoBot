@@ -353,9 +353,9 @@ class MessageProcessor:
         search_match = self.command_patterns['search'].search(full_response)
         if search_match:
             search_query = search_match.group(1).strip()
-            await placeholder_msg.edit_text(f"🔍 Searching: {search_query}...")
+            await placeholder_msg.edit_text(f"🔍 Searching & scraping: {search_query}...")
             
-            search_results = await BraveSearch.search(search_query)
+            search_results = await BraveSearch.search_with_scrape(search_query)
             
             # Add intermediate exchange to history
             await self.chat_manager.append_message(chat_id, {"role": "assistant", "content": full_response})

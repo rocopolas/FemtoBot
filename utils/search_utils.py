@@ -85,6 +85,106 @@ class BraveSearch:
                 return f"[Search error: {str(e)}]"
         
         return "[Error: Maximum retries exceeded]"
+    
+    @staticmethod
+    async def _raw_search(query: str, count: int = 3) -> list[dict]:
+        """
+        Raw search returning structured results.
+        Returns list of dicts with title, description, url.
+        """
+        import asyncio
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        if not BRAVE_API_KEY:
+            return []
+        
+        headers = {
+            "Accept": "application/json",
+            "X-Subscription-Token": BRAVE_API_KEY
+        }
+        params = {"q": query, "count": count}
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    BraveSearch.BASE_URL,
+                    headers=headers,
+                    params=params,
+                    timeout=10.0
+                )
+                response.raise_for_status()
+                data = response.json()
+                
+                results = []
+                for r in data.get("web", {}).get("results", [])[:count]:
+                    results.append({
+                        "title": r.get("title", ""),
+                        "description": r.get("description", ""),
+                        "url": r.get("url", "")
+                    })
+                return results
+        except Exception as e:
+            logger.error(f"Raw search error: {e}")
+            return []
+
+    @staticmethod
+    async def search_with_scrape(query: str, count: int = 3) -> str:
+        """
+        Search the web and scrape the top results for full content.
+        Returns formatted results with full page text for richer LLM context.
+        """
+        import asyncio
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        raw_results = await BraveSearch._raw_search(query, count)
+        if not raw_results:
+            return await BraveSearch.search(query, count)
+        
+        try:
+            from utils.web_fetcher import WebFetcher
+            fetcher = WebFetcher(timeout=10.0, max_content_length=4000)
+        except ImportError:
+            logger.warning("WebFetcher not available, falling back to basic search")
+            return await BraveSearch.search(query, count)
+        
+        formatted = []
+        
+        async def fetch_one(result: dict) -> str:
+            url = result["url"]
+            title = result["title"]
+            desc = result["description"]
+            
+            content = await fetcher.fetch_content(url)
+            
+            if content and len(content.strip()) > 50:
+                return (
+                    f"**{title}**\n"
+                    f"URL: {url}\n"
+                    f"Content:\n{content}"
+                )
+            else:
+                return (
+                    f"**{title}**\n"
+                    f"URL: {url}\n"
+                    f"Summary: {desc}"
+                )
+        
+        tasks = [fetch_one(r) for r in raw_results]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        for i, result in enumerate(results, 1):
+            if isinstance(result, str):
+                formatted.append(f"{i}. {result}")
+            else:
+                # Exception fallback
+                r = raw_results[i-1]
+                formatted.append(f"{i}. **{r['title']}**\n   {r['description']}\n   {r['url']}")
+        
+        return "\n\n".join(formatted) if formatted else "[No results found]"
 
     @staticmethod
     async def search_images(query: str, count: int = 5) -> list[str]:
