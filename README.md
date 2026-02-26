@@ -12,6 +12,7 @@ A smart personal assistant designed for small local models, recommended for GPUs
 - 🎙️ **Audio transcription** - Convert voice messages to text with Whisper
 - 🎥 **YouTube summaries** - Send a link and get a summary
 - 🐦 **Twitter/X downloader** - Download videos/images directly
+- 🧩 **LLM Skills (SKILL.md)** - Drop-in modular skills for customizing bot behavior
 - 🔍 **Web search** - SearXNG Search integration
 - 🖼️ **Image search** - Search for images on the web
 - 📄 **Document reading** - Analyze and chat with PDF or text files
@@ -222,6 +223,27 @@ femtobot tui
 | `/status` | View context and token usage |
 | `/unload` | Unload all models from RAM |
 
+
+### 🧩 Custom LLM Skills (`SKILL.md`)
+
+FemtoBot natively supports the open standard `SKILL.md` paradigm. You can automatically inject specialized knowledge, behaviors, or rules into the bot's system prompt dynamically without changing code.
+
+1. Create a `skills/` directory in the root of the project.
+2. Inside it, create subdirectories for any skill you want (e.g., `skills/coding/`).
+3. Place a `SKILL.md` file inside that subdirectory containing your Markdown-formatted rules.
+
+**Example `skills/example/SKILL.md`:**
+```markdown
+---
+name: Custom Behavior
+description: Makes the bot speak like a pirate.
+---
+
+# Personality Rules
+Whenever you respond, always talk like a pirate. Use words like "Ahoy!", "Matey", and "Ye".
+```
+The bot will automatically read all `SKILL.md` files on startup and integrate them into the master prompt!
+
 ## 📁 Project Structure
 ```
 FemtoBot/
@@ -229,6 +251,10 @@ FemtoBot/
 ├── .env                     # Environment variables (tokens)
 ├── requirements.txt         # Python dependencies
 ├── run.sh                   # Run script (setup + run)
+│
+├── skills/                  # Drop-in SKILL.md modules
+│   └── my_skill/
+│       └── SKILL.md
 │
 ├── src/                     # Source code
 │   ├── telegram_bot.py      # Main Telegram bot (Entry Point)

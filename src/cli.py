@@ -193,13 +193,17 @@ def serve():
 
 
 @cli.command()
-def start():
+@click.option("-f", "--follow", is_flag=True, help="Follow log output after starting in real-time")
+@click.pass_context
+def start(ctx, follow):
     """Start the Telegram bot as a background daemon."""
     _ensure_dir()
 
     pid = _read_pid()
     if _is_running(pid):
         click.secho(f"⚠ FemtoBot is already running (PID {pid})", fg=YELLOW)
+        if follow:
+            ctx.invoke(logs, follow=True, lines=50)
         return
 
     # Check Ollama
@@ -227,7 +231,11 @@ def start():
     time.sleep(1)
     if _is_running(proc.pid):
         click.secho(f"✓ FemtoBot started (PID {proc.pid})", fg=GREEN)
-        click.echo(f"  Logs: {LOG_FILE}")
+        if follow:
+            click.echo()
+            ctx.invoke(logs, follow=True, lines=50)
+        else:
+            click.echo(f"  Logs: {LOG_FILE}")
     else:
         click.secho("✗ FemtoBot failed to start. Check logs:", fg=RED)
         click.echo(f"  {LOG_FILE}")

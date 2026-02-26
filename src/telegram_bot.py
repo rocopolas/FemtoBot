@@ -47,6 +47,7 @@ from src.services.message_processor import MessageProcessor
 
 from utils.config_loader import get_config, get_all_config, is_feature_enabled
 from utils.logger import setup_logging
+from utils.skill_loader import load_all_skills
 
 # Load environment variables
 load_dotenv()
@@ -152,24 +153,36 @@ def is_authorized(user_id: int) -> bool:
     return user_id in AUTHORIZED_USERS
 
 def load_instructions():
-    """Load system instructions from file."""
+    """Load system instructions from file and append dynamically loaded skills."""
     global system_instructions
     try:
         from src.constants import CONFIG_DIR
         instructions_path = os.path.join(CONFIG_DIR, get_config("INSTRUCTIONS_FILE"))
         with open(instructions_path, "r", encoding="utf-8") as f:
             content = f.read().strip()
-            if content:
-                system_instructions = content
-                logger.info("Instructions loaded successfully")
+            
+        skills_content = load_all_skills()
+        
+        if content or skills_content:
+            system_instructions = content + ("\n\n" + skills_content if skills_content else "")
+            logger.info("Instructions and skills loaded successfully")
+            
     except FileNotFoundError:
         logger.warning("Instructions file not found")
+        # Try to load just skills anyway
+        skills_content = load_all_skills()
+        if skills_content:
+            system_instructions = skills_content
+            logger.info("Only skills loaded successfully (no base instructions)")
     except Exception as e:
         logger.error(f"Error loading instructions: {e}")
 
 def get_system_prompt():
     """Get system instructions."""
-    return system_instructions if system_instructions else ""
+    global system_instructions
+    prompt = system_instructions if system_instructions else ""
+    logger.info(f"== DEBUG SYSTEM PROMPT LENGTH: {len(prompt)} ==")
+    return prompt
 
 def update_activity():
     """Update last activity timestamp."""
