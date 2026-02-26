@@ -7,6 +7,7 @@ VISION_MODEL: null
 MATH_MODEL: lmstudio-community/Qwen2.5-Math-7B-Instruct-GGUF
 OCR_MODEL: null
 CONTEXT_LIMIT: 8192
+SEARXNG_URL: http://localhost:8080
 WHISPER_LANGUAGE: es
 WHISPER_MODEL_VOICE: turbo
 WHISPER_MODEL_EXTERNAL: turbo

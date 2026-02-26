@@ -1686,7 +1686,10 @@ def doctor():
     # 9. Crawl4AI + Playwright
     try:
         import crawl4ai
-        click.secho(f"  ✓ Crawl4AI {crawl4ai.__version__}", fg=GREEN)
+        version = getattr(crawl4ai, "__version__", "installed")
+        if isinstance(version, type(sys)): # Handle if it's a module
+            version = "installed"
+        click.secho(f"  ✓ Crawl4AI {version}", fg=GREEN)
     except (ImportError, AttributeError):
         try:
             import crawl4ai
@@ -1697,13 +1700,13 @@ def doctor():
 
     # Check Playwright Chromium browser
     try:
-        result = subprocess.run(
-            ["playwright", "install", "--dry-run", "chromium"],
-            capture_output=True, text=True, timeout=5
-        )
-        # Fallback: just check if the binary exists
         import glob
+        # Usually in ~/.cache/ms-playwright/chromium-*/chrome-linux*/chrome
         chromium_paths = glob.glob(os.path.expanduser("~/.cache/ms-playwright/chromium*/chrome-linux*/chrome"))
+        if not chromium_paths:
+            # Try newer path structure
+            chromium_paths = glob.glob(os.path.expanduser("~/.cache/ms-playwright/chromium_headless_shell*/chrome-headless-shell-linux*/chrome-headless-shell"))
+        
         if chromium_paths:
             click.secho("  ✓ Playwright Chromium browser installed", fg=GREEN)
         else:
@@ -1711,6 +1714,36 @@ def doctor():
             issues += 1
     except Exception:
         click.secho("  ⚠ Could not verify Playwright browser", fg=YELLOW)
+
+    # 10. SearXNG
+    import httpx
+    from utils.search_utils import SEARXNG_URL
+    try:
+        r = httpx.get(f"{SEARXNG_URL}/search?q=test&format=json", timeout=3)
+        if r.status_code == 200:
+            click.secho(f"  ✓ SearXNG running at {SEARXNG_URL}", fg=GREEN)
+            
+            # Check if JSON format is actually returning results
+            try:
+                data = r.json()
+                if "results" in data:
+                    click.secho("  ✓ SearXNG JSON API format enabled", fg=GREEN)
+                else:
+                    click.secho("  ✗ SearXNG JSON API returned unexpected format", fg=RED)
+                    issues += 1
+            except ValueError:
+                click.secho("  ✗ SearXNG is NOT returning JSON. Ensure 'json' is in formats in settings.yml", fg=RED)
+                issues += 1
+        else:
+            if r.status_code == 403:
+                click.secho(f"  ✗ SearXNG returned 403 Forbidden. JSON format might be disabled in settings.yml", fg=RED)
+            else:
+                click.secho(f"  ✗ SearXNG returned status {r.status_code}", fg=RED)
+            issues += 1
+    except Exception:
+        click.secho(f"  ✗ SearXNG not reachable at {SEARXNG_URL}", fg=RED)
+        click.secho("    To install: bash src/scripts/install_searxng.sh", fg=YELLOW)
+        issues += 1
 
     # Summary
     click.echo()

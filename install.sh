@@ -257,6 +257,14 @@ fi
 crawl4ai-setup --no-browser 2>/dev/null || echo -e "${YELLOW}   crawl4ai-setup skipped (will auto-init on first use)${NC}"
 echo -e "${GREEN}   ✓ Crawl4AI configured${NC}"
 
+# SearXNG: Install self-hosted search engine
+echo -e "\n${CYAN}   Setting up SearXNG (web search engine)...${NC}"
+if [ -f "src/scripts/install_searxng.sh" ]; then
+    bash src/scripts/install_searxng.sh 8888 || echo -e "${YELLOW}   ⚠ SearXNG setup had issues. You can run it manually: bash src/scripts/install_searxng.sh${NC}"
+else
+    echo -e "${YELLOW}   ⚠ install_searxng.sh script not found${NC}"
+fi
+
 # 4. Configuration Setup
 echo -e "\n${CYAN}[4/6] Setting up configuration...${NC}"
 

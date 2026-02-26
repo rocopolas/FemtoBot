@@ -1,72 +1,74 @@
+"""Search utility using SearXNG (self-hosted meta-search engine)."""
 import os
 import httpx
-from dotenv import load_dotenv
+import logging
+from typing import List, Optional
 
-load_dotenv()
-BRAVE_API_KEY = os.getenv("BRAVE_API_KEY", "")
+from utils.config_loader import get_config
+
+logger = logging.getLogger(__name__)
+
+# SearXNG URL from config or env, defaults to localhost:8080
+def _get_searxng_url() -> str:
+    """Get SearXNG base URL from config."""
+    try:
+        cfg = get_config("SEARXNG_URL")
+        if cfg:
+            return cfg.rstrip("/")
+    except Exception:
+        pass
+    return os.getenv("SEARXNG_URL", "http://localhost:8080")
+
+SEARXNG_URL = _get_searxng_url()
+
 
 class BraveSearch:
-    """Utility class for Brave Search API."""
-    
-    BASE_URL = "https://api.search.brave.com/res/v1/web/search"
+    """
+    Web search via SearXNG (self-hosted).
+    Class name kept as BraveSearch for backward compatibility.
+    """
     
     @staticmethod
     async def search(query: str, count: int = 3) -> str:
         """
-        Searches the web using Brave Search API.
+        Search the web using SearXNG.
         Returns formatted results as a string.
         """
-        import asyncio
-        import logging
-        
-        logger = logging.getLogger(__name__)
-        
-        if not BRAVE_API_KEY:
-            return "[Error: BRAVE_API_KEY not configured in .env]"
-        
-        headers = {
-            "Accept": "application/json",
-            "X-Subscription-Token": BRAVE_API_KEY
-        }
-        
         params = {
             "q": query,
-            "count": count
+            "format": "json",
+            "categories": "general",
         }
         
         max_retries = 3
-        base_delay = 2.0
+        base_delay = 1.0
         
         for attempt in range(max_retries):
             try:
                 async with httpx.AsyncClient() as client:
                     response = await client.get(
-                        BraveSearch.BASE_URL,
-                        headers=headers,
+                        f"{SEARXNG_URL}/search",
                         params=params,
-                        timeout=10.0
+                        timeout=15.0
                     )
                     
                     if response.status_code == 429:
                         if attempt < max_retries - 1:
-                            delay = base_delay * (2 ** attempt)  # Exponential backoff
-                            logger.warning(f"Rate limit hit (429). Retrying in {delay}s...")
+                            import asyncio
+                            delay = base_delay * (2 ** attempt)
+                            logger.warning(f"SearXNG rate limit. Retrying in {delay}s...")
                             await asyncio.sleep(delay)
                             continue
-                        else:
-                            return "[Error: Rate limit exceeded (429)]"
-                            
+                        return "[Error: Rate limit exceeded]"
+                    
                     response.raise_for_status()
                     data = response.json()
                     
-                    # Format results
                     results = []
-                    web_results = data.get("web", {}).get("results", [])
-                    
-                    for i, result in enumerate(web_results[:count], 1):
-                        title = result.get("title", "No title")
-                        description = result.get("description", "No description")
-                        url = result.get("url", "")
+                    for i, r in enumerate(data.get("results", [])[:count], 1):
+                        title = r.get("title", "No title")
+                        description = r.get("content", r.get("description", "No description"))
+                        url = r.get("url", "")
                         results.append(f"{i}. **{title}**\n   {description}\n   {url}")
                     
                     if not results:
@@ -75,11 +77,12 @@ class BraveSearch:
                     return "\n\n".join(results)
                     
             except httpx.HTTPStatusError as e:
-                logger.error(f"Search API error: {e}")
+                logger.error(f"SearXNG error: {e}")
                 return f"[Search error: {e.response.status_code}]"
             except Exception as e:
-                logger.error(f"Unexpected search error: {e}")
+                logger.error(f"Search error: {e}")
                 if attempt < max_retries - 1:
+                    import asyncio
                     await asyncio.sleep(1)
                     continue
                 return f"[Search error: {str(e)}]"
@@ -87,41 +90,32 @@ class BraveSearch:
         return "[Error: Maximum retries exceeded]"
     
     @staticmethod
-    async def _raw_search(query: str, count: int = 3) -> list[dict]:
+    async def _raw_search(query: str, count: int = 3) -> List[dict]:
         """
         Raw search returning structured results.
         Returns list of dicts with title, description, url.
         """
-        import asyncio
-        import logging
-        
-        logger = logging.getLogger(__name__)
-        
-        if not BRAVE_API_KEY:
-            return []
-        
-        headers = {
-            "Accept": "application/json",
-            "X-Subscription-Token": BRAVE_API_KEY
+        params = {
+            "q": query,
+            "format": "json",
+            "categories": "general",
         }
-        params = {"q": query, "count": count}
         
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    BraveSearch.BASE_URL,
-                    headers=headers,
+                    f"{SEARXNG_URL}/search",
                     params=params,
-                    timeout=10.0
+                    timeout=15.0
                 )
                 response.raise_for_status()
                 data = response.json()
                 
                 results = []
-                for r in data.get("web", {}).get("results", [])[:count]:
+                for r in data.get("results", [])[:count]:
                     results.append({
                         "title": r.get("title", ""),
-                        "description": r.get("description", ""),
+                        "description": r.get("content", r.get("description", "")),
                         "url": r.get("url", "")
                     })
                 return results
@@ -135,21 +129,18 @@ class BraveSearch:
         Search the web and scrape the top results for full content.
         Returns formatted results with full page text for richer LLM context.
         """
-        import asyncio
-        import logging
-        
-        logger = logging.getLogger(__name__)
-        
         raw_results = await BraveSearch._raw_search(query, count)
         if not raw_results:
             return await BraveSearch.search(query, count)
         
         try:
             from utils.web_fetcher import WebFetcher
-            fetcher = WebFetcher(timeout=10.0, max_content_length=4000)
+            fetcher = WebFetcher(max_content_length=4000)
         except ImportError:
             logger.warning("WebFetcher not available, falling back to basic search")
             return await BraveSearch.search(query, count)
+        
+        import asyncio
         
         formatted = []
         
@@ -180,44 +171,41 @@ class BraveSearch:
             if isinstance(result, str):
                 formatted.append(f"{i}. {result}")
             else:
-                # Exception fallback
                 r = raw_results[i-1]
                 formatted.append(f"{i}. **{r['title']}**\n   {r['description']}\n   {r['url']}")
         
         return "\n\n".join(formatted) if formatted else "[No results found]"
 
     @staticmethod
-    async def search_images(query: str, count: int = 5) -> list[str]:
+    async def search_images(query: str, count: int = 5) -> List[str]:
         """
-        Searches for images using Brave Search API.
+        Search for images using SearXNG.
         Returns a list of image URLs.
         """
-        if not BRAVE_API_KEY:
-            return []
-        
-        url = "https://api.search.brave.com/res/v1/images/search"
-        headers = {
-            "Accept": "application/json",
-            "X-Subscription-Token": BRAVE_API_KEY
+        params = {
+            "q": query,
+            "format": "json",
+            "categories": "images",
         }
-        params = {"q": query, "count": count}
         
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.get(url, headers=headers, params=params, timeout=10.0)
+                response = await client.get(
+                    f"{SEARXNG_URL}/search",
+                    params=params,
+                    timeout=10.0
+                )
                 response.raise_for_status()
                 data = response.json()
                 
-                results = data.get("results", [])
                 image_urls = []
-                for result in results:
-                    # 'properties' -> 'url' is the image source
-                    img_url = result.get("properties", {}).get("url")
+                for r in data.get("results", []):
+                    img_url = r.get("img_src") or r.get("url", "")
                     if img_url:
                         image_urls.append(img_url)
-                        
+                
                 return image_urls[:count]
                 
         except Exception as e:
-            print(f"[Brave Images] Error: {e}")
+            logger.error(f"Image search error: {e}")
             return []

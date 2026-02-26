@@ -262,6 +262,17 @@ async def send_telegramify_results(context, chat_id, results, placeholder_msg=No
             elif hasattr(item, 'content'):
                 msg = await context.bot.send_message(chat_id, item.content, reply_to_message_id=reply_to_message_id)
                 sent_messages.append(msg)
+            elif hasattr(item, 'file_data'):
+                try:
+                    text_fallback = item.file_data.decode('utf-8', errors='replace')
+                    caption = getattr(item, 'caption_text', '')
+                    if caption:
+                        text_fallback = f"{caption}\n\n{text_fallback}"
+                    for chunk in split_message(text_fallback):
+                        msg = await context.bot.send_message(chat_id, chunk, reply_to_message_id=reply_to_message_id)
+                        sent_messages.append(msg)
+                except Exception:
+                    pass
     
     return sent_messages
 
@@ -383,7 +394,7 @@ def prune_history(history: list, limit: int = 30000) -> list:
         return history
     
     # Remove oldest messages until under limit
-    while messages and total_length > limit:
+    while len(messages) > 1 and total_length > limit:
         removed = messages.pop(0)
         total_length -= len(str(removed.get("content", "")))
     
