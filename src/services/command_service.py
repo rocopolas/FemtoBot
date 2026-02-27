@@ -1,5 +1,5 @@
 """
-Command Service for handling internal bot commands (Cron, Memory, Lights).
+Command Service for handling internal bot commands (Cron, Memory, Lights, Terminal).
 """
 import re
 import os
@@ -10,6 +10,7 @@ from utils.cron_utils import CronUtils
 from utils.wiz_utils import control_light
 from utils.config_loader import get_config, is_feature_enabled
 from utils.telegram_utils import escape_code
+from src.services.terminal_service import TerminalService
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,7 @@ class CommandService:
         self.patterns = command_patterns
         self.config_dir = config_dir
         self.events_file = os.path.join(config_dir, get_config("EVENTS_FILE"))
+        self.terminal_service = TerminalService()
 
     async def process_commands(self, response_text: str, chat_id: int, context) -> bool:
         """
@@ -50,6 +52,11 @@ class CommandService:
         # 5. Light Control
         if is_feature_enabled("WIZ_LIGHTS"):
             if await self._handle_light_control(response_text, chat_id, context):
+                commands_processed = True
+
+        # 6. Terminal
+        if is_feature_enabled("TERMINAL"):
+            if await self._handle_terminal(response_text, chat_id, context):
                 commands_processed = True
             
         return commands_processed
@@ -202,4 +209,35 @@ class CommandService:
             
             result = await control_light(name, action, value)
             await context.bot.send_message(chat_id, result)
+        return processed
+
+    async def _handle_terminal(self, text: str, chat_id: int, context) -> bool:
+        """Execute terminal commands requested by the LLM."""
+        processed = False
+        for match in self.patterns['terminal'].finditer(text):
+            processed = True
+            raw_cmd = match.group(1).strip()
+            
+            # Validate
+            is_valid, reason = self.terminal_service.validate_command(raw_cmd)
+            if not is_valid:
+                await context.bot.send_message(
+                    chat_id,
+                    f"⛔ Terminal blocked: {reason}"
+                )
+                logger.warning(f"[TERMINAL] Rejected: {raw_cmd!r} — {reason}")
+                continue
+            
+            # Execute
+            await context.bot.send_message(chat_id, f"💻 `{escape_code(raw_cmd)}`", parse_mode="Markdown")
+            output = await self.terminal_service.execute(raw_cmd)
+            
+            # Send output
+            # Truncate for Telegram (4096 limit minus some margin for formatting)
+            display_output = output[:3900]
+            await context.bot.send_message(
+                chat_id,
+                f"```\n{display_output}\n```",
+                parse_mode="Markdown"
+            )
         return processed

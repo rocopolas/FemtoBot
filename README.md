@@ -22,6 +22,7 @@ A smart personal assistant designed for small local models, recommended for GPUs
 - 💡 **Smart lights** - Control WIZ lights via chat
 - 🧮 **Math solver** - Solve complex equations and symbolic math problems
 - 📤 **File upload** - Upload files to Catbox.moe
+- 💻 **Terminal access** - LLM can execute shell commands securely (disabled by default)
 
 **Catbox.moe**
 ![FemtoBot in action](https://files.catbox.moe/rpkd1y.jpg)
@@ -179,6 +180,7 @@ FEATURES:
   DEEP_RESEARCH: true
   YOUTUBE: true
   TWITTER: true
+  TERMINAL: false  # LLM shell access (disabled by default)
 ```
 
 ## 🎮 Usage
@@ -264,6 +266,7 @@ FemtoBot/
 │   ├── services/           # Business Logic Services
 │   │   ├── rag_service.py      # RAG & Context Management
 │   │   ├── media_service.py    # Twitter/YouTube handling
+│   │   ├── terminal_service.py # Secure shell execution
 │   │   └── command_service.py  # Internal bot commands
 │   ├── handlers/           # Message handlers
 │   │   ├── commands.py     # Bot slash commands

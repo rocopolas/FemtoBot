@@ -89,6 +89,7 @@ COMMAND_PATTERNS = {
     'luz': re.compile(r':::luz:*\s+(\S+)\s+(\S+)(?:\s+(\S+))?:::'),
     'camara': re.compile(r':::camara:*(?:\s+\S+)?:::'),
     'matematicas': re.compile(r':::matematicas:::'),
+    'terminal': re.compile(r':::terminal:*\s*(.+?):::', re.DOTALL),
 }
 
 # Initialize Command Service

@@ -271,7 +271,7 @@ class OllamaClient:
             }
             try:
                 client = self._get_client()
-                response = await client.post(url, json=payload, timeout=60.0)
+                response = await client.post(url, json=payload, timeout=120.0)
                 if response.status_code == 200:
                     logger.info(f"Successfully loaded model in LM Studio: {model} with ctx {context_limit}")
                     return True
@@ -310,11 +310,28 @@ class OllamaClient:
     async def unload_model(self, model: str) -> bool:
         """
         Unload a model from memory.
-        No-op for LM Studio (model lifecycle managed by the GUI).
+        
+        - LM Studio: POST /api/v1/models/unload with instance_id
+        - Ollama: POST /api/chat with keep_alive=0
         """
         if self.provider == "lmstudio":
-            logger.debug(f"Skipping model unload for LM Studio: {model}")
-            return True
+            base = self.base_url.replace("/v1", "") if self.base_url.endswith("/v1") else self.base_url
+            url = f"{base}/api/v1/models/unload"
+            payload = {
+                "instance_id": model
+            }
+            try:
+                client = self._get_client()
+                response = await client.post(url, json=payload, timeout=30.0)
+                if response.status_code == 200:
+                    logger.info(f"Successfully unloaded model in LM Studio: {model}")
+                    return True
+                else:
+                    logger.warning(f"Failed to unload model {model} in LM Studio: {response.status_code} - {response.text}")
+                    return False
+            except Exception as e:
+                logger.warning(f"Failed to unload model {model} in LM Studio: {e}")
+                return False
         
         url = f"{self.base_url}/api/chat"
         payload = {

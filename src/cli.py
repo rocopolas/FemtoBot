@@ -581,6 +581,7 @@ def setup():
         ("DEEP_RESEARCH", "🧠 Deep research mode", True),
         ("YOUTUBE", "🎥 YouTube summaries & downloads", True),
         ("TWITTER", "🐦 Twitter/X media downloads", True),
+        ("TERMINAL", "💻 Terminal access for LLM (shell commands)", False),
     ]
     
     for key, label, default in feature_prompts:
@@ -965,6 +966,7 @@ def wizard():
                 "DEEP_RESEARCH": "🧠 Deep Research",
                 "YOUTUBE": "🎥 YouTube",
                 "TWITTER": "🐦 Twitter/X",
+                "TERMINAL": "💻 Terminal (LLM shell access)",
             }
 
             for key, label in feature_labels.items():

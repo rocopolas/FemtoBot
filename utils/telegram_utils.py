@@ -363,6 +363,9 @@ def format_bot_response(response: str) -> str:
     formatted = re.sub(r':::luz(?::)?\s*.+?:::', '', formatted, flags=re.IGNORECASE)
     formatted = re.sub(r':::camara(?::)?(?:\s+\S+)?:::', '', formatted)
     
+    # Handle terminal commands
+    formatted = re.sub(r':::terminal(?::)?\s*.+?:::', '', formatted, flags=re.DOTALL)
+    
     # LaTeX math is now handled automatically by telegramify-markdown
     
     # Strip wrapping quotes the LLM sometimes adds
