@@ -271,7 +271,7 @@ class OllamaClient:
             }
             try:
                 client = self._get_client()
-                response = await client.post(url, json=payload, timeout=120.0)
+                response = await client.post(url, json=payload, timeout=300)
                 if response.status_code == 200:
                     logger.info(f"Successfully loaded model in LM Studio: {model} with ctx {context_limit}")
                     return True
@@ -381,7 +381,7 @@ class OllamaClient:
         
         try:
             client = self._get_client()
-            response = await client.post(url, json=payload, timeout=120.0)
+            response = await client.post(url, json=payload, timeout=300)
             if response.status_code == 200:
                 data = response.json()
                 description = data.get("message", {}).get("content", "[No description]")
@@ -434,7 +434,7 @@ class OllamaClient:
         
         try:
             client = self._get_client()
-            response = await client.post(url, json=payload, timeout=120.0)
+            response = await client.post(url, json=payload, timeout=300)
             if response.status_code == 200:
                 data = response.json()
                 choices = data.get("choices", [])
