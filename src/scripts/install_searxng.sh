@@ -91,9 +91,22 @@ enabled_plugins:
   - 'Hash plugin'
   - 'Self Information'
   - 'Tracker URL remover'
+
+engines:
+  - name: bing images
+    engine: bing
+    shortcut: bi
+    categories: images
+    disabled: false
+  
+  - name: google images
+    engine: google
+    shortcut: go
+    categories: images
+    disabled: false
 SETTINGS
 
-echo -e "${GREEN}✓ Settings configured (JSON API enabled)${NC}"
+echo -e "${GREEN}✓ Settings configured (JSON API & Image Engines enabled)${NC}"
 
 # Ensure proper permissions for the searxng user inside docker
 sudo chown -R 977:977 . || echo -e "${YELLOW}Could not chown to 977 (docker mapping), it might still work.${NC}"

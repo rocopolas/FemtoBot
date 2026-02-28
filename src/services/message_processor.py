@@ -181,7 +181,8 @@ class MessageProcessor:
                 # Pass reply_to_message_id only if use_reply is True
                 await send_telegramify_results(context, chat_id, chunks, placeholder_msg, reply_to_message_id=final_reply_id)
             
-            await self.chat_manager.append_message(chat_id, {"role": "assistant", "content": full_response})
+            if cleaned_text:
+                await self.chat_manager.append_message(chat_id, {"role": "assistant", "content": cleaned_text})
             
             # 7. Process System Commands (Cron, Memory, etc)
             commands_processed = await self.command_service.process_commands(full_response, chat_id, context)
@@ -410,5 +411,43 @@ class MessageProcessor:
             )
                 
             return final_response
+            
+        # 3. Foto Command
+        foto_match = self.command_patterns['foto'].search(full_response)
+        if foto_match:
+            foto_query = foto_match.group(1).strip()
+            await placeholder_msg.edit_text(f"🖼️ Buscando imágenes de: {foto_query}...")
+            
+            # It uses SearXNG categories="images" which the user states doesn't work out of the box.
+            # SearXNG image search sometimes doesn't work if engines aren't active.
+            # I will use the established `WebSearch.search_images(foto_query)`.
+            image_urls = await WebSearch.search_images(foto_query)
+            
+            if image_urls:
+                import httpx
+                sent = False
+                for img_url in image_urls:
+                    try:
+                        # Test if the URL is accessible and actually an image
+                        async with httpx.AsyncClient() as client:
+                            img_resp = await client.head(img_url, timeout=5)
+                            if img_resp.status_code == 200 and 'image' in img_resp.headers.get('content-type', ''):
+                                await context.bot.send_photo(
+                                    chat_id,
+                                    img_url,
+                                    caption=f"🔍 Resultado para: {foto_query}"
+                                )
+                                sent = True
+                                break
+                    except Exception as e:
+                        logger.warning(f"Failed to fetch image {img_url}: {e}")
+                        continue
+                        
+                if not sent:
+                    await context.bot.send_message(chat_id, f"❌ Encontré resultados para '{foto_query}', pero las imágenes no estaban accesibles.")
+            else:
+                await context.bot.send_message(chat_id, f"❌ No encontré ninguna imagen para: {foto_query}")
+                
+            # No need to requery the LLM for foto, the action is independent
             
         return full_response
