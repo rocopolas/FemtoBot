@@ -13,7 +13,7 @@ import logging
 from src.client import OllamaClient
 from src.state.chat_manager import ChatManager
 from src.middleware.rate_limiter import rate_limit
-from utils.config_loader import get_config
+from utils.config_loader import get_config, is_feature_enabled
 from utils.telegram_utils import format_bot_response, split_message, prune_history, telegramify_content, send_telegramify_results, stream_to_telegram
 
 logger = logging.getLogger(__name__)
@@ -137,7 +137,7 @@ class PhotoHandler:
             )
             
             # --- Step 2: Math detection ---
-            if has_text and self._contains_math(ocr_text):
+            if has_text and self._contains_math(ocr_text) and is_feature_enabled("MATH_SOLVER"):
                 # Route to math model
                 math_model = get_config("MATH_MODEL")
                 await status_msg.edit_text(f"🧮 Math detected, solving with {math_model}...")

@@ -26,8 +26,8 @@ RAG:
   MAX_RESULTS: 3
 FEATURES:
   WIZ_LIGHTS: false
-  EMAIL_DIGEST: false
-  MATH_SOLVER: true
+  EMAIL_DIGEST: true
+  MATH_SOLVER: false
   DEEP_RESEARCH: true
   YOUTUBE: true
   TWITTER: true
