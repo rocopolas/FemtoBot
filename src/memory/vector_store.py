@@ -52,6 +52,19 @@ class VectorManager:
             metadata={"hnsw:space": "cosine"}
         )
         
+        # Skills Database (Separate Instance)
+        skills_path = os.path.join(DATA_DIR, "skills_db")
+        os.makedirs(skills_path, exist_ok=True)
+        
+        self.skills_chroma = chromadb.PersistentClient(
+            path=skills_path,
+            settings=Settings(anonymized_telemetry=False, allow_reset=True)
+        )
+        self.skills_collection = self.skills_chroma.get_or_create_collection(
+            name="skills",
+            metadata={"hnsw:space": "cosine"}
+        )
+        
         logger.info(f"VectorManager initialized with model: {self.embedding_model}")
 
     async def _get_embedding(self, text: str) -> List[float]:
@@ -134,10 +147,87 @@ class VectorManager:
                 return True
                 
             return False
-            
         except Exception as e:
             logger.error(f"Error deleting memory: {e}")
             return False
+
+    async def initialize_skills(self, skills_dict: Dict[str, str]) -> None:
+        """
+        Clear the existing skills collection and re-index the provided skills.
+        """
+        try:
+            # Drop the existing collection to start fresh
+            self.skills_chroma.delete_collection("skills")
+            self.skills_collection = self.skills_chroma.get_or_create_collection(
+                name="skills",
+                metadata={"hnsw:space": "cosine"}
+            )
+            
+            if not skills_dict:
+                logger.info("No skills provided to initialize.")
+                return
+                
+            documents = []
+            metadatas = []
+            ids = []
+            
+            logger.info(f"Initializing {len(skills_dict)} skills into vector database...")
+            
+            for name, content in skills_dict.items():
+                # We embed the name + description/content for better search retrieval
+                # But we store the full content in the document
+                doc_text = f"Skill: {name}\n\n{content}"
+                
+                embedding = await self._get_embedding(doc_text)
+                if embedding:
+                    # Chroma expects list of floats for embedding
+                    self.skills_collection.add(
+                        documents=[doc_text],
+                        embeddings=[embedding],
+                        metadatas=[{"name": name}],
+                        ids=[name]
+                    )
+            
+            logger.info(f"Successfully vectorized and stored {len(skills_dict)} skills.")
+            
+        except Exception as e:
+            logger.error(f"Error initializing skills vector database: {e}", exc_info=True)
+
+    async def search_skills(self, query: str, limit: int = 2) -> List[Dict[str, Any]]:
+        """
+        Search for relevant skills based on user input.
+        """
+        try:
+            query_embedding = await self._get_embedding(query)
+            if not query_embedding:
+                return []
+                
+            results = self.skills_collection.query(
+                query_embeddings=[query_embedding],
+                n_results=limit
+            )
+            
+            parsed_results = []
+            if results["documents"] and results["documents"][0]:
+                for i, doc in enumerate(results["documents"][0]):
+                    distance = results["distances"][0][i] if results.get("distances") else 1.0
+                    similarity = 1 - distance 
+                    
+                    # For skills, we might want a slightly lower threshold to ensure we catch intents
+                    skill_threshold = max(0.4, self.similarity_threshold - 0.2)
+                    
+                    if similarity >= skill_threshold:
+                        parsed_results.append({
+                            "name": results["metadatas"][0][i]["name"],
+                            "content": doc,
+                            "similarity": similarity
+                        })
+                        
+            return parsed_results
+            
+        except Exception as e:
+            logger.error(f"Error searching skills vector store: {e}")
+            return []
 
     async def search(self, query: str, collection_type: str = "documents", limit: int = None) -> List[Dict[str, Any]]:
         """

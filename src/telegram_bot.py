@@ -154,7 +154,7 @@ def is_authorized(user_id: int) -> bool:
     return user_id in AUTHORIZED_USERS
 
 def load_instructions():
-    """Load system instructions from file and append dynamically loaded skills."""
+    """Load system instructions from file (skills are now loaded via embeddings)."""
     global system_instructions
     try:
         from src.constants import CONFIG_DIR
@@ -162,19 +162,12 @@ def load_instructions():
         with open(instructions_path, "r", encoding="utf-8") as f:
             content = f.read().strip()
             
-        skills_content = load_all_skills()
-        
-        if content or skills_content:
-            system_instructions = content + ("\n\n" + skills_content if skills_content else "")
-            logger.info("Instructions and skills loaded successfully")
+        if content:
+            system_instructions = content
+            logger.info("Base instructions loaded successfully")
             
     except FileNotFoundError:
         logger.warning("Instructions file not found")
-        # Try to load just skills anyway
-        skills_content = load_all_skills()
-        if skills_content:
-            system_instructions = skills_content
-            logger.info("Only skills loaded successfully (no base instructions)")
     except Exception as e:
         logger.error(f"Error loading instructions: {e}")
 
@@ -426,6 +419,13 @@ def main():
         logger.info("Email digest job scheduled")
     
     logger.info("FemtoBot started successfully!")
+    
+    # Initialize Skills into the separate Vector DB
+    skills_dict = load_all_skills()
+    if skills_dict:
+        logger.info(f"Loaded {len(skills_dict)} skills, initializing Vector Store...")
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(vector_manager.initialize_skills(skills_dict))
     
     # Run with conflict retry logic
     max_retries = 10

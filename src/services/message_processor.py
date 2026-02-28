@@ -139,6 +139,18 @@ class MessageProcessor:
             model = get_config("MODEL")
             context_limit = get_config("CONTEXT_LIMIT", 30000)
             
+            # Retrieve dynamic skills based on user_text
+            skills_results = await self.rag_service.vector_manager.search_skills(user_text, limit=2)
+            if skills_results:
+                skills_context = "\n\n# ADDED SKILLS (Important Instructions)\nThe following skills represent specific tasks you know how to do. Always follow these rules when the user's prompt relates to them.\n\n"
+                for skill in skills_results:
+                    skills_context += f"### Skill: {skill['name']}\n{skill['content']}\n\n"
+                    logger.info(f"Dynamically injected skill: {skill['name']} (Sim: {skill['similarity']:.3f})")
+                
+                # Append skills context explicitly to the latest user message or as a system prompt right before it
+                if history and history[-1].get("role") == "user":
+                     history[-1]["content"] = f"{skills_context}\n\n{history[-1]['content']}"
+
             # Ensure model is strictly loaded with our parameters
             await self.ollama_client.load_model(model)
             

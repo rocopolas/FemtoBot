@@ -25,7 +25,7 @@ def load_all_skills() -> str:
             logger.error(f"Failed to create skills directory: {e}")
             return ""
 
-    combined_skills = []
+    skills_dict = {}
     
     # We walk the directory to support both flat and nested skill structures
     # e.g., skills/weather/SKILL.md or skills/my_custom_skill/SKILL.md
@@ -44,17 +44,9 @@ def load_all_skills() -> str:
                     with open(skill_path, "r", encoding="utf-8") as f:
                         content = f.read().strip()
                         if content:
-                            combined_skills.append(f"### Skill: {skill_name}\n{content}")
-                            logger.info(f"Loaded skill: {skill_name}")
+                            skills_dict[skill_name] = content
+                            logger.info(f"Loaded skill file: {skill_name}")
                 except Exception as e:
                     logger.error(f"Error loading skill file {skill_path}: {e}")
 
-    if not combined_skills:
-        return ""
-
-    # Combine all skills into a single block
-    separator = "\n\n" + "-" * 40 + "\n\n"
-    header = "\n\n# ADDED SKILLS (Important Instructions)\n"
-    header += "The following skills represent specific tasks you know how to do. Always follow these rules when the user's prompt relates to them.\n\n"
-    
-    return header + separator.join(combined_skills)
+    return skills_dict
