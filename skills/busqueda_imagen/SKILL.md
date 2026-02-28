@@ -10,3 +10,6 @@ Ejemplo CORRECTO:
 
 Ejemplo INCORRECTO (no pasa nada, el usuario no recibe imagen):
 "Entendido, aquí tienes una foto de un gato."
+
+**PALABRAS CLAVE (KEYWORDS para activar esta habilidad):**
+fotos, imagenes, imagen, buscar foto, buscar imagen, imagenes de, fotos de, mostrar foto, ver foto, foto de, foto de.

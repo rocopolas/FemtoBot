@@ -144,7 +144,8 @@ class MessageProcessor:
             if skills_results:
                 skills_context = "\n\n# ADDED SKILLS (Important Instructions)\nThe following skills represent specific tasks you know how to do. Always follow these rules when the user's prompt relates to them.\n\n"
                 for skill in skills_results:
-                    skills_context += f"### Skill: {skill['name']}\n{skill['content']}\n\n"
+                    clean_content = skill['content'].split('**PALABRAS CLAVE')[0].strip()
+                    skills_context += f"### Skill: {skill['name']}\n{clean_content}\n\n"
                     logger.info(f"Dynamically injected skill: {skill['name']} (Sim: {skill['similarity']:.3f})")
                 
                 # Append skills context explicitly to the latest user message or as a system prompt right before it

@@ -13,3 +13,6 @@ Acciones Luz:
 - `:::luz todas apagar:::`
 
 Colores: rojo, verde, azul, amarillo, naranja, rosa, morado, violeta, celeste, blanco, calido, frio
+
+**PALABRAS CLAVE (KEYWORDS para activar esta habilidad):**
+luz, luces, foco, lampara, lamparita, prender, apagar, color de la luz, prende, apaga, iluminacion, mi pieza, mi dormitorio.

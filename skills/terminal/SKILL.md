@@ -18,3 +18,6 @@ El sistema ejecutará el comando y te dará la salida. LUEGO debes interpretar l
 - Solo puedes usar comandos de lectura/consulta (ls, cat, grep, df, free, ps, etc.)
 - NO puedes modificar archivos del sistema
 - Si necesitas ejecutar varios comandos para completar una tarea, usa uno por cada `:::terminal:::`
+
+**PALABRAS CLAVE (KEYWORDS para activar esta habilidad):**
+terminal, consola, bash, linux, comandos, ejecutar, script, listar, directorio, carpeta, archivos, ficheros, leer, disco, procesos, procesador, ram, cpu, home, root, ruta, ls, cat, pw, pwd, sistema, servidor, consola.

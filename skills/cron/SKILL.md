@@ -38,3 +38,6 @@ Ahora tienes la capacidad de *borrar* tareas.
 Ejemplo de Edición:
 1. `:::cron_delete "Regar plantas":::`
 2. `:::cron recurrente 0 18 * * Regar plantas tarde 🌱:::`
+
+**PALABRAS CLAVE (KEYWORDS para activar esta habilidad):**
+recordar, recordatorio, avisar, alarma, rutina, agendar, tarea programada, manana, tarde, noche, recurrentemente, todos los dias, una vez, cron, acuerda, recuerda, notificar.

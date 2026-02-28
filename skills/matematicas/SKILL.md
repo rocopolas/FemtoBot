@@ -11,3 +11,6 @@ Ejemplos de problemas matemáticos:
 - Geometría: "Encuentra el área de un círculo con radio 5"
 - Álgebra lineal: "Multiplica estas matrices"
 - Estadística: "Calcula la desviación estándar de..."
+
+**PALABRAS CLAVE (KEYWORDS para activar esta habilidad):**
+calcular, matematica, numeros, cuanto es, suma, resta, multiplicacion, division, ecuacion, resolver, operacion, porcentaje, logaritmo, seno, fisica, geometria, algebra.
