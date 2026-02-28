@@ -332,27 +332,32 @@ class MessageProcessor:
         """
         
         # 1. Math Command
-        if is_feature_enabled("MATH_SOLVER") and self.command_patterns['matematicas'].search(full_response):
-            await placeholder_msg.edit_text("🧮 Solving math...")
-            math_model = get_config("MATH_MODEL")
-            logger.info(f"Math command detected, querying {math_model}")
-            
-            # Prepare messages without RAG system prompt
-            math_messages = [msg for msg in message_history if msg.get("role") != "system"]
-            if math_messages and math_messages[-1].get("role") == "user":
-                 math_messages[-1] = {"role": "user", "content": original_user_text}
+        if self.command_patterns['matematicas'].search(full_response):
+            if is_feature_enabled("MATH_SOLVER"):
+                await placeholder_msg.edit_text("🧮 Solving math...")
+                math_model = get_config("MATH_MODEL")
+                logger.info(f"Math command detected, querying {math_model}")
+                
+                # Prepare messages without RAG system prompt
+                math_messages = [msg for msg in message_history if msg.get("role") != "system"]
+                if math_messages and math_messages[-1].get("role") == "user":
+                     math_messages[-1] = {"role": "user", "content": original_user_text}
+                else:
+                     math_messages.append({"role": "user", "content": original_user_text})
+                
+                await self.ollama_client.load_model(math_model)
+                
+                math_response = await stream_to_telegram(
+                    self.ollama_client.stream_chat(math_model, math_messages),
+                    placeholder_msg
+                )
+                
+                await self.ollama_client.unload_model(math_model)
+                return math_response
             else:
-                 math_messages.append({"role": "user", "content": original_user_text})
-            
-            await self.ollama_client.load_model(math_model)
-            
-            math_response = await stream_to_telegram(
-                self.ollama_client.stream_chat(math_model, math_messages),
-                placeholder_msg
-            )
-            
-            await self.ollama_client.unload_model(math_model)
-            return math_response
+                # Math solver is disabled, logic handled by main model during normal generation
+                # Strip the command from the response so it's not shown to the user
+                return self.command_patterns['matematicas'].sub('', full_response).strip()
             
         # 2. Search Command
         search_match = self.command_patterns['search'].search(full_response)
