@@ -367,7 +367,7 @@ def format_bot_response(response: str) -> str:
     formatted = re.sub(r':::terminal(?::)?\s*.+?:::', '', formatted, flags=re.DOTALL)
     
     # Handle matematicas commands (when disabled, shouldn't show)
-    formatted = re.sub(r':::matematicas(?::)?\s*.+?:::', '', formatted, flags=re.DOTALL)
+    formatted = re.sub(r':::matematicas.*?:::', '', formatted, flags=re.DOTALL)
     
     # LaTeX math is now handled automatically by telegramify-markdown
     

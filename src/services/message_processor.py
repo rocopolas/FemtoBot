@@ -335,20 +335,28 @@ class MessageProcessor:
         if self.command_patterns['matematicas'].search(full_response):
             await placeholder_msg.edit_text("🧮 Solving math...")
             
+            original_model = get_config("MODEL")
+            
             if is_feature_enabled("MATH_SOLVER"):
                 math_model = get_config("MATH_MODEL")
             else:
-                math_model = get_config("MODEL")
+                math_model = original_model
                 
-            logger.info(f"Math command detected, querying {math_model}")
+            logger.info(f"Math command detected, querying {math_model} (Isolated Instance)")
             
-            # Prepare messages without RAG system prompt
-            math_messages = [msg for msg in message_history if msg.get("role") != "system"]
-            if math_messages and math_messages[-1].get("role") == "user":
-                 math_messages[-1] = {"role": "user", "content": original_user_text}
-            else:
-                 math_messages.append({"role": "user", "content": original_user_text})
+            # Prepare an isolated context specifically for math
+            math_messages = [
+                {
+                    "role": "system", 
+                    "content": "Eres un experto matemático. Resuelve el siguiente problema paso a paso y de forma clara. NO uses comandos como :::matematicas:::, simplemente da la respuesta directamente."
+                },
+                {"role": "user", "content": original_user_text}
+            ]
             
+            # If the original model is loaded and we are switching to another, unload it
+            if math_model != original_model:
+                await self.ollama_client.unload_model(original_model)
+                
             await self.ollama_client.load_model(math_model)
             
             math_response = await stream_to_telegram(
@@ -356,7 +364,8 @@ class MessageProcessor:
                 placeholder_msg
             )
             
-            if math_model != get_config("MODEL"):
+            # Unload the math model if it's different from the original base model
+            if math_model != original_model:
                 await self.ollama_client.unload_model(math_model)
                 
             return math_response
