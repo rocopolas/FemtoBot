@@ -262,6 +262,22 @@ class OllamaClient:
             # Note: This often requires the base URL to be adjusted if it points to /v1
             # Usually LM Studio API is on port 1234
             base = self.base_url.replace("/v1", "") if self.base_url.endswith("/v1") else self.base_url
+            
+            # 1. Check if the model is already loaded
+            check_url = f"{base}/v1/models"
+            try:
+                client = self._get_client()
+                check_response = await client.get(check_url, timeout=5)
+                if check_response.status_code == 200:
+                    data = check_response.json()
+                    loaded_models = [m.get("id") for m in data.get("data", [])]
+                    if model in loaded_models:
+                        logger.debug(f"Model {model} is already loaded in LM Studio, skipping load.")
+                        return True
+            except Exception as e:
+                logger.warning(f"Failed to check loaded models in LM Studio: {e}")
+
+            # 2. If not loaded, request LM Studio to load it
             url = f"{base}/api/v1/models/load"
             
             payload = {

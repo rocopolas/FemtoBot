@@ -180,6 +180,12 @@ def update_activity():
     global last_activity
     last_activity = datetime.now()
 
+is_generating = False
+
+def get_is_generating() -> bool:
+    """Check if bot is actively generating a response."""
+    return is_generating
+
 # Initialize handlers
 command_handlers = CommandHandlers(
     chat_manager=chat_manager,
@@ -221,7 +227,7 @@ document_handler = DocumentHandler(
 
 async def queue_worker():
     """Process messages from queue."""
-    global queue_worker_running, last_activity
+    global queue_worker_running, last_activity, is_generating
     
     try:
         while True:
@@ -233,6 +239,7 @@ async def queue_worker():
                 return
             
             last_activity = datetime.now()
+            is_generating = True
             try:
                 # Initialize chat in ChatManager if needed (redundant check but safe)
                 chat_id = update.effective_chat.id
@@ -253,6 +260,9 @@ async def queue_worker():
                     await context.bot.send_message(chat_id, f"❌ Error processing message: {e}")
                 except Exception:
                     pass
+            finally:
+                is_generating = False
+                last_activity = datetime.now()
             
             message_queue.task_done()
     finally:
@@ -392,6 +402,7 @@ def main():
     
     inactivity_job = InactivityJob(
         get_last_activity_func=lambda: last_activity,
+        is_generating_func=get_is_generating,
         model=MODEL
     )
     application.job_queue.run_repeating(

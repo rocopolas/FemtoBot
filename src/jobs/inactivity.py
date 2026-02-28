@@ -13,8 +13,9 @@ logger = logging.getLogger(__name__)
 class InactivityJob(BackgroundJob):
     """Job to check for inactivity and unload models."""
     
-    def __init__(self, get_last_activity_func, model: str = None):
+    def __init__(self, get_last_activity_func, is_generating_func=None, model: str = None):
         self.get_last_activity = get_last_activity_func
+        self.is_generating = is_generating_func
         self.model = model or get_config("MODEL")
         self.inactivity_threshold_minutes = get_config("INACTIVITY_TIMEOUT_MINUTES", 30)
     
@@ -29,6 +30,10 @@ class InactivityJob(BackgroundJob):
     async def run(self, context: ContextTypes.DEFAULT_TYPE):
         """Check inactivity and unload models if inactive."""
         try:
+            # Do not unload if currently generating a response
+            if self.is_generating and self.is_generating():
+                return
+                
             last_activity = self.get_last_activity()
             inactive_time = datetime.now() - last_activity
             

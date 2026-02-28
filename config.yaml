@@ -2,7 +2,7 @@ BACKEND:
   PROVIDER: lmstudio
   OLLAMA_URL: http://localhost:11434
   LMSTUDIO_URL: http://localhost:1234
-MODEL: qwen/qwen3.5-35b-a3b
+MODEL: qwen/qwen3-vl-8b #qwen/qwen3.5-35b-a3b
 VISION_MODEL: null
 MATH_MODEL: lmstudio-community/Qwen2.5-Math-7B-Instruct-GGUF
 OCR_MODEL: null
